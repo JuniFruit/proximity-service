@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  redis_geo_1:
+    container_name: REDIS_GEO_1
+    image: redis/redis-stack
+    restart: always
+    ports:
+      - "6377:6379"
+  redis_business_info_1:
+    container_name: REDIS_BUSINESS_INFO_1
+    image: redis:7.0
+    restart: always
+    ports:
+      - "6378:6379"
+  mongo:
+    container_name: MONGO_MAIN_1
+    image: mongo
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+    ports:
+      - "127.0.0.1:27017:27017"
+networks:
+  default:
+    name: proximity_service_${NODE_ENV:-production}
