@@ -51,69 +51,68 @@ const connectToAllDbs = async () => {
 const generateRecords = async () => {
   const countriesStream = fs.createReadStream(COUNTRIES_PATH);
   const clients = await connectToAllDbs();
+  const maxRecords = 1553663;
   const rl = readline.createInterface({
     input: countriesStream,
     crlfDelay: Infinity,
   });
-  // Note: we use the crlfDelay option to recognize all instances of CR LF
-  // ('\r\n') in input.txt as a single line break.
+
   let ind = 0;
   for await (const line of rl) {
-    const splitted = line.split("\t");
-    const countryCode = splitted[0];
-    const zipCode = splitted[1];
-    const street = splitted[2];
-    const city = splitted[3];
-    const lat = +splitted[splitted.length - 3];
-    const lon = +splitted[splitted.length - 2];
+    try {
+      if (ind % 5000 === 0) {
+        const done = (ind / maxRecords) * 100;
+        console.clear();
+        console.log("Done: " + Math.trunc(done) + "%");
+      }
+      const splitted = line.split("\t");
+      const countryCode = splitted[0];
+      const zipCode = splitted[1];
+      const street = splitted[2];
+      const city = splitted[3];
+      const lat = +splitted[splitted.length - 3];
+      const lon = +splitted[splitted.length - 2];
 
-    if (ind % 20 === 0) {
-      console.log("Waiting for 2 sec...");
-      await new Promise(res => {
-        setTimeout(() => {
-          console.log("Resuming...");
-          res(true);
-        }, 2000);
-      });
+      const record = Object.setPrototypeOf(
+        {
+          id: ind,
+          countryCode,
+          zipCode,
+          street,
+          name: NAMES[rnd(NAMES.length)] + " " + NAMES[rnd(NAMES.length)],
+          stars: rnd(5),
+          type: TYPES[rnd(TYPES.length)],
+          city,
+          lat,
+          lon,
+        },
+        null
+      );
+      const promises = [
+        clients.redisGeo1.call("GEOADD", record.countryCode, record.lon, record.lat, record.id),
+        clients.redisBusiness1.call(
+          "HSET",
+          record.id,
+          "name",
+          record.name,
+          "stars",
+          record.stars,
+          "street",
+          record.street,
+          "lat",
+          record.lat,
+          "lon",
+          record.lon
+        ),
+        clients.mongoDB.collection("businesses").insertOne(record),
+      ];
+      await Promise.all(promises);
+      ind++;
+    } catch (error) {
+      handleErr(error);
+      ind++;
+      continue;
     }
-
-    const record = Object.setPrototypeOf(
-      {
-        id: ind,
-        countryCode,
-        zipCode,
-        street,
-        name: NAMES[rnd(NAMES.length)] + " " + NAMES[rnd(NAMES.length)],
-        stars: rnd(5),
-        type: TYPES[rnd(TYPES.length)],
-        city,
-        lat,
-        lon,
-      },
-      null
-    );
-
-    clients.redisGeo1
-      .call("GEOADD", record.countryCode, record.lon, record.lat, record.id)
-      .catch(handleErr);
-    clients.redisBusiness1
-      .call(
-        "HSET",
-        record.id,
-        "name",
-        record.name,
-        "stars",
-        record.stars,
-        "street",
-        record.street,
-        "lat",
-        record.lat,
-        "lon",
-        record.lon
-      )
-      .catch(handleErr);
-    clients.mongoDB.collection("businesses").insertOne(record).catch(handleErr);
-    ind++;
   }
 };
 

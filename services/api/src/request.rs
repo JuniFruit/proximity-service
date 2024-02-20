@@ -1,10 +1,13 @@
-use crate::response::Result;
-use crate::response::{INTERNAL_SERVER_ERROR, NOT_FOUND, OK_RESPONSE};
-use serde_json::{Map, Value};
+use crate::mongo::MongoDb;
+use crate::response::Response;
+use crate::router::Router;
+use serde_json::Value;
 use std::collections::{HashMap, VecDeque};
 use std::io::Read;
 use std::net::TcpStream;
+
 // Very basic request struct. We're not going implement entire HTTP protocol
+#[derive(Clone)]
 pub struct Request {
     pub host: Option<String>,
     pub method: Option<String>,
@@ -13,8 +16,9 @@ pub struct Request {
     pub content_length: Option<String>,
     pub path: Option<String>,
     pub http_version: Option<String>,
-    pub body: Option<Map<String, Value>>,
+    pub body: Option<Value>,
     pub params: HashMap<String, String>,
+    pub mongo: Option<MongoDb>,
 }
 impl Request {
     pub fn default() -> Request {
@@ -28,6 +32,7 @@ impl Request {
             http_version: Some(String::from("HTTP/1.1")),
             body: None,
             params: HashMap::new(),
+            mongo: None,
         }
     }
 }
@@ -75,17 +80,12 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
         if splitted[0].contains("{") {
             let parsed_body: Option<Value> = serde_json::from_str(line.unwrap()).unwrap_or(None);
             if let Some(value) = parsed_body {
-                request_struct.body = Some(value.as_object().unwrap().clone());
+                request_struct.body = Some(value);
             }
         }
 
         ind += 1;
     }
-}
-
-pub struct Router<'a> {
-    pub handlers: HashMap<String, fn(&Request) -> Result<Value>>,
-    pub paths: Vec<&'a str>,
 }
 
 fn construct_params(
@@ -106,12 +106,12 @@ fn construct_params(
 }
 
 fn path_parser<'a>(
-    router: &'a Router,
+    paths: Vec<&'a str>,
     requested_path: &str,
     params_map: &mut HashMap<String, String>,
 ) -> Option<&'a str> {
     let mut matched_path: Option<&str> = None;
-    for path in &router.paths {
+    for path in paths {
         let mut splitted_existing = path.split("/").collect::<VecDeque<&str>>();
         let mut splitted_requested = requested_path.split("/").collect::<VecDeque<&str>>();
 
@@ -131,33 +131,33 @@ fn path_parser<'a>(
     matched_path
 }
 
-pub fn handle_request(req: &mut Request, router: &Router) -> String {
+pub async fn handle_request<'a>(req: &mut Request, router: &'a Router) -> String {
     if req.method.is_none() || req.path.is_none() {
-        return String::from(NOT_FOUND);
+        return Response::not_found(None).to_response_string();
     }
 
-    let matched_path = path_parser(router, req.path.as_ref().unwrap(), &mut req.params);
+    let mut paths: Vec<&str> = vec![];
+    for key in router.handlers.keys() {
+        let splitted: Vec<&str> = key.as_str().split_whitespace().collect();
+        paths.push(splitted[1])
+    }
+
+    let matched_path = path_parser(paths, req.path.as_ref().unwrap(), &mut req.params);
     if matched_path.is_none() {
-        return String::from(NOT_FOUND);
+        return Response::not_found(None).to_response_string();
     }
 
     let req_key = format!("{} {}", req.method.as_ref().unwrap(), matched_path.unwrap());
     let handler = router.handlers.get(&req_key);
     if handler.is_none() {
-        return String::from(NOT_FOUND);
+        return Response::not_found(None).to_response_string();
     }
-    match handler.unwrap()(req) {
-        Ok(res) => {
-            let content_length = format!(
-                "Content-Length: {}\r\n\r\n",
-                res.to_string().as_bytes().len()
-            );
-            let response = format!("{} {} {}", OK_RESPONSE, content_length, res);
-            response
-        }
+
+    match handler.unwrap()(req.clone()).await {
+        Ok(res) => res.to_response_string(),
         Err(e) => {
             println!("{:?}", e);
-            String::from(INTERNAL_SERVER_ERROR)
+            Response::internal(None).to_response_string()
         }
     }
 }

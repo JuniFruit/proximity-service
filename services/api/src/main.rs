@@ -1,65 +1,64 @@
 mod config;
+mod mongo;
 mod request;
 mod response;
+mod router;
 
 use config::ServerConfig;
+use mongo::MongoDb;
+use request::Request;
 use request::{handle_request, parse_tcp_stream};
-use request::{Request, Router};
 use response::Result;
-use serde_json::{json, Value};
-use std::collections::HashMap;
+use router::Router;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 
-fn main() {
+struct DBConnections {
+    mongo: MongoDb,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
     let config: ServerConfig = ServerConfig::get();
-    let router = create_router();
+    let mongo: MongoDb = MongoDb::connect(&config.mongo).await.unwrap();
+    let router = Router::init();
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.port))
         .expect("Server failed to start at {config.port}");
+    println!("Server is listening at {}", config.port);
+
     for stream in listener.incoming() {
         match stream {
-            Ok(stream) => handle_tcp_stream(stream, &router),
+            Ok(stream) => {
+                handle_tcp_stream(
+                    stream,
+                    &router,
+                    DBConnections {
+                        mongo: mongo.clone(),
+                    },
+                )
+                .await;
+            }
 
             Err(e) => {
                 println!("Error: {}", e);
             }
         }
     }
+    Ok(())
 }
 
-fn handle_tcp_stream(mut stream: TcpStream, router: &Router) {
+async fn handle_tcp_stream(mut stream: TcpStream, router: &Router, db_clients: DBConnections) {
+    println!("New incoming request...");
     let mut req: Request = Request::default();
+    req.mongo = Some(db_clients.mongo);
     parse_tcp_stream(&mut stream, &mut req);
-    let response = handle_request(&mut req, router);
+    let response = handle_request(&mut req, router).await;
+    println!(
+        "{} {} was requested",
+        req.method.unwrap(),
+        req.path.unwrap()
+    );
     stream
         .write_all(response.as_bytes())
         .expect("Failed to write back")
-}
-
-fn create_router<'a>() -> Router<'a> {
-    let mut handlers: HashMap<String, fn(&Request) -> Result<Value>> = HashMap::new();
-    let paths = vec!["/test", "/business/:id"];
-    handlers.insert(String::from("GET /test"), handle_get_test);
-    handlers.insert(String::from("GET /business/:id"), handle_get_business);
-
-    Router { handlers, paths }
-}
-
-fn handle_get_test(req: &Request) -> Result<Value> {
-    let t = req.body.as_ref();
-    println!("{:?}", t);
-    let body = json!({
-        "message": "Request successfull",
-        "data": t
-    });
-    Ok(body)
-}
-
-fn handle_get_business(req: &Request) -> Result<Value> {
-    let id = req.params.get("id").unwrap();
-
-    let body = json!({
-        "data": id
-    });
-    Ok(body)
 }
