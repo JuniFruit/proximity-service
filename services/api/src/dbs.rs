@@ -1,6 +1,24 @@
+use crate::config::ServerConfig;
 use bson::doc;
 use mongodb::{error::Result, Client, Collection};
 use serde::{Deserialize, Serialize};
+
+pub struct DBConnections {
+    pub mongo: MongoDb,
+    pub redis_business: RedisBusiness,
+}
+
+impl DBConnections {
+    pub async fn init(config: &ServerConfig) -> Result<DBConnections> {
+        let mongo = MongoDb::connect(&config.mongo).await?;
+        let redis_business = RedisBusiness::connect(&config.redis_business)?;
+
+        Ok(DBConnections {
+            mongo,
+            redis_business,
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct MongoDb {
@@ -20,9 +38,10 @@ impl MongoDb {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BusinessData {
     pub id: Option<u64>,
-    pub contry_code: String,
+    pub country_code: String,
     pub zip_code: String,
     pub street: String,
     pub name: String,
@@ -61,13 +80,25 @@ impl BusinessData {
             .await?;
         Ok(())
     }
-    pub fn from_value(value: serde_json::Value) -> serde_json::Result<BusinessData> {
-        match serde_json::from_value(value) {
+    pub fn from_value(value: &serde_json::Value) -> serde_json::Result<BusinessData> {
+        match serde_json::from_value(value.clone()) {
             Ok(res) => Ok(res),
             Err(e) => {
                 println!("{:?}", e);
                 Err(e)
             }
         }
+    }
+}
+
+pub struct RedisBusiness {
+    connection: redis::Connection,
+}
+
+impl RedisBusiness {
+    pub fn connect(conn_str: &str) -> Result<RedisBusiness> {
+        let client = redis::Client::open(conn_str).unwrap();
+        let connection = client.get_connection().unwrap();
+        Ok(RedisBusiness { connection })
     }
 }

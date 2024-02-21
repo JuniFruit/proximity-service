@@ -1,4 +1,4 @@
-use crate::mongo::MongoDb;
+use crate::dbs::{MongoDb, RedisBusiness};
 use crate::response::Response;
 use crate::router::Router;
 use serde_json::Value;
@@ -8,7 +8,7 @@ use std::net::TcpStream;
 
 // Very basic request struct. We're not going implement entire HTTP protocol
 #[derive(Clone)]
-pub struct Request {
+pub struct Request<'a> {
     pub host: Option<String>,
     pub method: Option<String>,
     pub user_agent: Option<String>,
@@ -18,10 +18,11 @@ pub struct Request {
     pub http_version: Option<String>,
     pub body: Option<Value>,
     pub params: HashMap<String, String>,
-    pub mongo: Option<MongoDb>,
+    pub mongo: Option<&'a MongoDb>,
+    pub redis_business: Option<&'a RedisBusiness>,
 }
-impl Request {
-    pub fn default() -> Request {
+impl<'a> Request<'a> {
+    pub fn default() -> Request<'a> {
         Request {
             host: Some(String::from("unknown")),
             method: Some(String::from("unknown")),
@@ -33,6 +34,7 @@ impl Request {
             body: None,
             params: HashMap::new(),
             mongo: None,
+            redis_business: None,
         }
     }
 }
@@ -51,7 +53,7 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
     let mut rows = request_raw.split("\r\n").collect::<VecDeque<&str>>();
     let mut ind = 0;
 
-    while rows.len() > 0 {
+    while !rows.is_empty() {
         let line = rows.pop_front();
         if line.is_none() {
             continue;
@@ -77,7 +79,7 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
         if splitted[0] == "Content-Length:" {
             request_struct.content_length = Some(splitted[1].to_string());
         }
-        if splitted[0].contains("{") {
+        if splitted[0].contains('{') {
             let parsed_body: Option<Value> = serde_json::from_str(line.unwrap()).unwrap_or(None);
             if let Some(value) = parsed_body {
                 request_struct.body = Some(value);
@@ -88,72 +90,14 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
     }
 }
 
-fn construct_params(
-    split_existing: &mut VecDeque<&str>,
-    split_requested: &mut VecDeque<&str>,
-    params_map: &mut HashMap<String, String>,
-) {
-    while split_existing.len() > 0 {
-        let current_existing = split_existing.pop_front().unwrap_or("");
-        let current_requested = split_requested.pop_front().unwrap_or("");
-        if current_existing != current_requested {
-            params_map.insert(
-                current_existing[1..].to_string(),
-                current_requested.to_string(),
-            );
-        }
-    }
-}
-
-fn path_parser<'a>(
-    paths: Vec<&'a str>,
-    requested_path: &str,
-    params_map: &mut HashMap<String, String>,
-) -> Option<&'a str> {
-    let mut matched_path: Option<&str> = None;
-    for path in paths {
-        let mut splitted_existing = path.split("/").collect::<VecDeque<&str>>();
-        let mut splitted_requested = requested_path.split("/").collect::<VecDeque<&str>>();
-
-        // delete empty string from start
-        splitted_requested.pop_front();
-        splitted_existing.pop_front();
-
-        // start constructing params if existing path is the same length as path from client and if
-        // their first values match
-        if splitted_requested.len() == splitted_existing.len()
-            && splitted_requested[0] == splitted_existing[0]
-        {
-            matched_path = Some(path);
-            construct_params(&mut splitted_existing, &mut splitted_requested, params_map);
-        }
-    }
-    matched_path
-}
-
-pub async fn handle_request<'a>(req: &mut Request, router: &'a Router) -> String {
+pub async fn handle_request<'a>(req: &mut Request<'a>, router: &Router<'a>) -> String {
     if req.method.is_none() || req.path.is_none() {
         return Response::not_found(None).to_response_string();
     }
 
-    let mut paths: Vec<&str> = vec![];
-    for key in router.handlers.keys() {
-        let splitted: Vec<&str> = key.as_str().split_whitespace().collect();
-        paths.push(splitted[1])
-    }
+    let response = router.handle_route(req).await;
 
-    let matched_path = path_parser(paths, req.path.as_ref().unwrap(), &mut req.params);
-    if matched_path.is_none() {
-        return Response::not_found(None).to_response_string();
-    }
-
-    let req_key = format!("{} {}", req.method.as_ref().unwrap(), matched_path.unwrap());
-    let handler = router.handlers.get(&req_key);
-    if handler.is_none() {
-        return Response::not_found(None).to_response_string();
-    }
-
-    match handler.unwrap()(req.clone()).await {
+    match response {
         Ok(res) => res.to_response_string(),
         Err(e) => {
             println!("{:?}", e);

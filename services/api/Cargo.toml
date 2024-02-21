@@ -14,7 +14,9 @@ bson = { version = "2", features = [
 ] } # Needed for using chrono datetime in doc
 chrono = "0.4" # Used for setting DateTimes
 # serde_json is just for the example, not required in general
+redis = "0.24.0"
 serde_json = "1.0"
 [env]
 PORT = 8081
-MONGODB_URI = 'mongodb://localhost:27017'
+MONGODB_URI = 'mongodb://root:password@localhost:27017'
+REDIS_BUSINESS_URI = 'redis://root:password@localhost:6378'

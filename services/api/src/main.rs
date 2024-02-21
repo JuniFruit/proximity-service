@@ -1,11 +1,11 @@
 mod config;
-mod mongo;
+mod dbs;
 mod request;
 mod response;
 mod router;
 
 use config::ServerConfig;
-use mongo::MongoDb;
+use dbs::DBConnections;
 use request::Request;
 use request::{handle_request, parse_tcp_stream};
 use response::Result;
@@ -13,30 +13,19 @@ use router::Router;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 
-struct DBConnections {
-    mongo: MongoDb,
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let config: ServerConfig = ServerConfig::get();
-    let mongo: MongoDb = MongoDb::connect(&config.mongo).await.unwrap();
-    let router = Router::init();
+    let connections = DBConnections::init(&config).await?;
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.port))
         .expect("Server failed to start at {config.port}");
     println!("Server is listening at {}", config.port);
+    let router = Router::init();
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_tcp_stream(
-                    stream,
-                    &router,
-                    DBConnections {
-                        mongo: mongo.clone(),
-                    },
-                )
-                .await;
+                handle_tcp_stream(stream, &router, &connections).await;
             }
 
             Err(e) => {
@@ -47,10 +36,15 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handle_tcp_stream(mut stream: TcpStream, router: &Router, db_clients: DBConnections) {
+async fn handle_tcp_stream<'a>(
+    mut stream: TcpStream,
+    router: &Router<'a>,
+    db_clients: &DBConnections,
+) {
     println!("New incoming request...");
     let mut req: Request = Request::default();
-    req.mongo = Some(db_clients.mongo);
+    req.mongo = Some(&db_clients.mongo);
+    req.redis_business = Some(&db_clients.redis_business);
     parse_tcp_stream(&mut stream, &mut req);
     let response = handle_request(&mut req, router).await;
     println!(
