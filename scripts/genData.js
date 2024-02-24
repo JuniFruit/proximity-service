@@ -22,7 +22,7 @@ const NAMES = [
 ];
 const TYPES = ["restaurant", "car-wash", "diner", "motel", "hotel"];
 
-const rnd = num => {
+const rnd = (num) => {
   return Math.floor(Math.random() * num);
 };
 
@@ -36,7 +36,7 @@ const connectToAllDbs = async () => {
     port: process.env.REDIS_BUSINESS_INFO_PORT_1,
   });
   const mongo1 = new mongoDriver.MongoClient(
-    `mongodb://${process.env.MONGO_INITDB_ROOT_USERNAME}:${process.env.MONGO_INITDB_ROOT_PASSWORD}@${process.env.MAIN_HOST}:${process.env.MONGO_MAIN_PORT_1}`
+    `mongodb://${process.env.MONGO_INITDB_ROOT_USERNAME}:${process.env.MONGO_INITDB_ROOT_PASSWORD}@${process.env.MAIN_HOST}:${process.env.MONGO_MAIN_PORT_1}`,
   );
   await mongo1.connect();
   const mongoDB = mongo1.db("main");
@@ -86,13 +86,23 @@ const generateRecords = async () => {
           lat,
           lon,
         },
-        null
+        null,
       );
       const promises = [
-        clients.redisGeo1.call("GEOADD", record.countryCode, record.lon, record.lat, record.id),
+        clients.redisGeo1.call(
+          "GEOADD",
+          "world",
+          record.lon,
+          record.lat,
+          record.id,
+        ),
         clients.redisBusiness1.call(
           "HSET",
           record.id,
+          "country_code",
+          record.countryCode,
+          "zip_code",
+          record.zipCode,
           "name",
           record.name,
           "stars",
@@ -102,7 +112,7 @@ const generateRecords = async () => {
           "lat",
           record.lat,
           "lon",
-          record.lon
+          record.lon,
         ),
         clients.mongoDB.collection("businesses").insertOne(record),
       ];
