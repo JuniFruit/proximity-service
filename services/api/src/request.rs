@@ -1,4 +1,4 @@
-use crate::dbs::{MongoDb, RedisBusiness};
+use crate::dbs::DBConnections;
 use crate::response::Response;
 use crate::router::Router;
 use serde_json::Value;
@@ -8,7 +8,7 @@ use std::net::TcpStream;
 
 // Very basic request struct. We're not going implement entire HTTP protocol
 #[derive(Clone)]
-pub struct Request<'a> {
+pub struct Request {
     pub host: Option<String>,
     pub method: Option<String>,
     pub user_agent: Option<String>,
@@ -18,11 +18,9 @@ pub struct Request<'a> {
     pub http_version: Option<String>,
     pub body: Option<Value>,
     pub params: HashMap<String, String>,
-    pub mongo: Option<&'a MongoDb>,
-    pub redis_business: Option<&'a RedisBusiness>,
 }
-impl<'a> Request<'a> {
-    pub fn default() -> Request<'a> {
+impl Request {
+    pub fn default() -> Request {
         Request {
             host: Some(String::from("unknown")),
             method: Some(String::from("unknown")),
@@ -33,8 +31,6 @@ impl<'a> Request<'a> {
             http_version: Some(String::from("HTTP/1.1")),
             body: None,
             params: HashMap::new(),
-            mongo: None,
-            redis_business: None,
         }
     }
 }
@@ -42,14 +38,13 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
     let mut buffer = [0; 1024];
 
     let request_raw;
+    if let Ok(size) = stream.read(&mut buffer) {
+        request_raw = String::from_utf8_lossy(&buffer[..size])
+    } else {
+        println!("Error reading incoming stream");
+        return;
+    }
 
-    match stream.read(&mut buffer) {
-        Ok(size) => request_raw = String::from_utf8_lossy(&buffer[..size]),
-        Err(e) => {
-            println!("Error reading incoming stream: {:?}", e);
-            return;
-        }
-    };
     let mut rows = request_raw.split("\r\n").collect::<VecDeque<&str>>();
     let mut ind = 0;
 
@@ -90,12 +85,16 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
     }
 }
 
-pub async fn handle_request<'a>(req: &mut Request<'a>, router: &Router<'a>) -> String {
+pub async fn handle_request<'a>(
+    req: &mut Request,
+    router: &Router<'a>,
+    conns: &mut DBConnections,
+) -> String {
     if req.method.is_none() || req.path.is_none() {
         return Response::not_found(None).to_response_string();
     }
 
-    let response = router.handle_route(req).await;
+    let response = router.handle_route(req, conns).await;
 
     match response {
         Ok(res) => res.to_response_string(),

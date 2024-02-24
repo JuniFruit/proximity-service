@@ -1,4 +1,4 @@
-use crate::dbs::BusinessData;
+use crate::dbs::{BusinessData, DBConnections};
 use crate::response::{Response, Result};
 use crate::Request;
 use serde_json::json;
@@ -15,7 +15,11 @@ impl<'a> Router<'a> {
 
         Router { routes }
     }
-    pub async fn handle_route<'b>(&self, req: &mut Request<'b>) -> Result<Response> {
+    pub async fn handle_route(
+        &self,
+        req: &mut Request,
+        connections: &mut DBConnections,
+    ) -> Result<Response> {
         let matched_path = self.path_parser(
             self.routes.clone(),
             req.path.as_ref().unwrap(),
@@ -30,28 +34,31 @@ impl<'a> Router<'a> {
         let mut result: Result<Response> = Ok(Response::not_found(None));
 
         if matched_path == "GET /business/:id" {
-            result = self.handle_get_business(req).await;
+            result = self.handle_get_business(req, connections).await;
         }
 
         if matched_path == "PUT /business/:id" {
             // result = s(req).await;
-            result = self.handle_update_business(req).await;
+            result = self.handle_update_business(req, connections).await;
         }
 
         if matched_path == "POST /business" {
-            result = self.handle_create_business(req).await;
+            result = self.handle_create_business(req, connections).await;
         }
 
         result
     }
 
-    async fn handle_get_business<'b>(&self, req: &Request<'b>) -> Result<Response> {
+    async fn handle_get_business(
+        &self,
+        req: &Request,
+        connections: &mut DBConnections,
+    ) -> Result<Response> {
         let id = req.params.get("id").unwrap().parse()?;
+        let data = BusinessData::get_business_by_id(connections, id).await?;
 
-        let data = BusinessData::get_business_by_id(req.mongo.unwrap(), id).await;
-        if data.is_err() {
-            println!("{:?}", data.err());
-            return Ok(Response::internal(None));
+        if data.is_none() {
+            return Ok(Response::success(json!({"data": ""}), None));
         }
         let body = json!({
             "data": data.unwrap()
@@ -59,7 +66,11 @@ impl<'a> Router<'a> {
         Ok(Response::success(body, None))
     }
 
-    async fn handle_create_business<'b>(&self, req: &Request<'b>) -> Result<Response> {
+    async fn handle_create_business(
+        &self,
+        req: &Request,
+        connections: &mut DBConnections,
+    ) -> Result<Response> {
         if req.body.is_none() {
             return Ok(Response::bad_request(Some("Missing data for new item")));
         }
@@ -68,13 +79,17 @@ impl<'a> Router<'a> {
         if serialized.is_err() {
             return Ok(Response::bad_request(Some("Invalid data for new item")));
         }
-        match BusinessData::create_business(req.mongo.unwrap(), serialized.unwrap()).await {
+        match BusinessData::create_business(connections, serialized.unwrap()).await {
             Ok(res) => Ok(Response::success(json!({"id": res}), None)),
-            Err(_) => Ok(Response::internal(None)),
+            Err(e) => Err(e),
         }
     }
 
-    async fn handle_update_business<'b>(&self, req: &Request<'b>) -> Result<Response> {
+    async fn handle_update_business(
+        &self,
+        req: &Request,
+        connections: &mut DBConnections,
+    ) -> Result<Response> {
         let id = req.params.get("id").unwrap().parse()?;
         if req.body.is_none() {
             return Ok(Response::bad_request(Some("Missing data for update")));
@@ -85,10 +100,9 @@ impl<'a> Router<'a> {
         if serialized.is_err() {
             return Ok(Response::bad_request(Some("Invalid data for update")));
         }
-        match BusinessData::update_business_by_id(req.mongo.unwrap(), id, serialized.unwrap()).await
-        {
+        match BusinessData::update_business_by_id(connections, id, serialized.unwrap()).await {
             Ok(_) => Ok(Response::default()),
-            Err(_) => Ok(Response::internal(None)),
+            Err(e) => Err(e),
         }
     }
 

@@ -16,7 +16,7 @@ use std::net::{TcpListener, TcpStream};
 #[tokio::main]
 async fn main() -> Result<()> {
     let config: ServerConfig = ServerConfig::get();
-    let connections = DBConnections::init(&config).await?;
+    let mut connections = DBConnections::init(&config).await?;
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.port))
         .expect("Server failed to start at {config.port}");
     println!("Server is listening at {}", config.port);
@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                handle_tcp_stream(stream, &router, &connections).await;
+                handle_tcp_stream(stream, &router, &mut connections).await;
             }
 
             Err(e) => {
@@ -39,14 +39,12 @@ async fn main() -> Result<()> {
 async fn handle_tcp_stream<'a>(
     mut stream: TcpStream,
     router: &Router<'a>,
-    db_clients: &DBConnections,
+    db_clients: &mut DBConnections,
 ) {
     println!("New incoming request...");
     let mut req: Request = Request::default();
-    req.mongo = Some(&db_clients.mongo);
-    req.redis_business = Some(&db_clients.redis_business);
     parse_tcp_stream(&mut stream, &mut req);
-    let response = handle_request(&mut req, router).await;
+    let response = handle_request(&mut req, router, db_clients).await;
     println!(
         "{} {} was requested",
         req.method.unwrap(),
