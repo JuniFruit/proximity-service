@@ -1,5 +1,4 @@
 use serde_json::{json, Value};
-use std::{error::Error, fmt};
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n";
 const BAD_REQUEST: &str = "HTTP/1.1 400 BAD_REQUEST\r\nContent-Type: application/json\r\n";
@@ -7,8 +6,6 @@ const UNAUTHORIZED: &str = "HTTP/1.1 401 UNAUTHORIZED\r\nContent-Type: applicati
 const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND\r\nContent-Type: application/json\r\n";
 const INTERNAL_SERVER_ERROR: &str =
     "HTTP/1.1 500 INTERNAL SERVER ERROR\r\nContent-Type: application/json\r\n";
-
-pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 pub struct Response {
     pub status: u16,
@@ -79,14 +76,5 @@ impl Response {
             response_type, server, content_length, self.body
         );
         response
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct InternalError;
-
-impl fmt::Display for InternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Internal server error")
     }
 }

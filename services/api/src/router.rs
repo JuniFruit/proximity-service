@@ -11,7 +11,11 @@ pub struct Router<'a> {
 
 impl<'a> Router<'a> {
     pub fn init() -> Router<'a> {
-        let routes = vec!["GET /business/:id", "PUT /business/:id", "POST /business"];
+        let routes = vec![
+            "GET /api/business/:id",
+            "PUT /api/business/:id",
+            "POST /api/business",
+        ];
 
         Router { routes }
     }
@@ -31,22 +35,12 @@ impl<'a> Router<'a> {
         }
         let matched_path = matched_path.unwrap();
 
-        let mut result: Result<Response> = Ok(Response::not_found(None));
-
-        if matched_path == "GET /business/:id" {
-            result = self.handle_get_business(req, connections).await;
+        match matched_path {
+            "GET /api/business/:id" => self.handle_get_business(req, connections).await,
+            "PUT /api/business/:id" => self.handle_update_business(req, connections).await,
+            "POST /api/business" => self.handle_create_business(req, connections).await,
+            _ => Ok(Response::not_found(None)),
         }
-
-        if matched_path == "PUT /business/:id" {
-            // result = s(req).await;
-            result = self.handle_update_business(req, connections).await;
-        }
-
-        if matched_path == "POST /business" {
-            result = self.handle_create_business(req, connections).await;
-        }
-
-        result
     }
 
     async fn handle_get_business(

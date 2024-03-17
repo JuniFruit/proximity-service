@@ -221,13 +221,13 @@ impl BusinessData {
 }
 
 pub struct RedisBusiness {
-    connection: redis::aio::Connection,
+    connection: redis::aio::MultiplexedConnection,
 }
 
 impl RedisBusiness {
     pub async fn connect(conn_str: &str) -> Result<RedisBusiness> {
         let client = redis::Client::open(conn_str).unwrap();
-        let connection = client.get_async_connection().await.unwrap();
+        let connection = client.get_multiplexed_async_connection().await.unwrap();
 
         Ok(RedisBusiness { connection })
     }

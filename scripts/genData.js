@@ -63,6 +63,7 @@ const generateRecords = async () => {
       if (ind % 5000 === 0) {
         const done = (ind / maxRecords) * 100;
         console.clear();
+        console.log("Migrating data... Items recorded: " + ind);
         console.log("Done: " + Math.trunc(done) + "%");
       }
       const splitted = line.split("\t");
@@ -113,6 +114,10 @@ const generateRecords = async () => {
           record.lat,
           "lon",
           record.lon,
+          "city",
+          record.city,
+          "type",
+          record.type,
         ),
         clients.mongoDB.collection("businesses").insertOne(record),
       ];

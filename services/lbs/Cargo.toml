@@ -1,0 +1,13 @@
+[package]
+name = "lbs"
+description = "LBS backend that returns business in designated area"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+redis = { version = "0.25.0", features = ["tokio-comp"] }
+serde_json = "1.0"

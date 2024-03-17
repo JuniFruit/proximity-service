@@ -1,26 +1,70 @@
 version: "3.9"
 services:
-  redis_geo_1:
-    container_name: REDIS_GEO_1
+  proxy:
+    image: proximity/proxy
+    build: ./services/proxy/
+    restart: always
+    networks:
+      - proximity
+    ports:
+      - "3000:3000"
+    environment:
+      - LBS_SERVER_HOST
+      - API_SERVER_HOST
+
+  redis-geo:
     image: redis/redis-stack
     restart: always
+    networks:
+      - proximity
     ports:
       - "6377:6379"
-  redis_business_info_1:
-    container_name: REDIS_BUSINESS_INFO_1
+  redis-business-info:
     image: redis:7.0
+    networks:
+      - proximity
     restart: always
     ports:
       - "6378:6379"
   mongo:
-    container_name: MONGO_MAIN_1
     image: mongo
     restart: always
+    networks:
+      - proximity
     environment:
       - MONGO_INITDB_ROOT_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD
     ports:
-      - "127.0.0.1:27017:27017"
+      - "27017:27017"
+  api:
+    networks:
+      - proximity
+    expose:
+      - 8080
+    image: proximity/api
+    build: ./services/api/
+    depends_on:
+      - mongo
+      - redis-business-info
+    restart: always
+    environment:
+      - MONGO_URI
+      - REDIS_BUSINESS_URI
+
+  lbs:
+    networks:
+      - proximity
+    expose:
+      - 8081
+    image: proximity/lbs
+    build: ./services/lbs/
+    restart: always
+    depends_on:
+      - redis-business-info
+      - redis-geo
+    environment:
+      - REDIS_GEO_URI
+      - REDIS_BUSINESS_URI
 networks:
-  default:
-    name: proximity_service_${NODE_ENV:-production}
+  proximity:
+    driver: bridge
