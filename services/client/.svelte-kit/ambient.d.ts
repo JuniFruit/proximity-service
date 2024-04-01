@@ -48,6 +48,7 @@ declare module '$env/static/private' {
 	export const __CF_USER_TEXT_ENCODING: string;
 	export const npm_execpath: string;
 	export const PATH: string;
+	export const LaunchInstanceID: string;
 	export const _: string;
 	export const npm_config_engine_strict: string;
 	export const npm_package_json: string;
@@ -77,13 +78,14 @@ declare module '$env/static/private' {
 	export const npm_config_cache: string;
 	export const npm_lifecycle_script: string;
 	export const LC_CTYPE: string;
+	export const KITTY_WINDOW_ID: string;
 	export const VIMRUNTIME: string;
 	export const KITTY_INSTALLATION_DIR: string;
-	export const KITTY_WINDOW_ID: string;
 	export const npm_config_user_agent: string;
 	export const HOMEBREW_CELLAR: string;
 	export const INFOPATH: string;
 	export const VIM: string;
+	export const SECURITYSESSIONID: string;
 	export const COLORTERM: string;
 	export const KITTY_PUBLIC_KEY: string;
 	export const npm_config_prefix: string;
@@ -141,6 +143,7 @@ declare module '$env/dynamic/private' {
 		__CF_USER_TEXT_ENCODING: string;
 		npm_execpath: string;
 		PATH: string;
+		LaunchInstanceID: string;
 		_: string;
 		npm_config_engine_strict: string;
 		npm_package_json: string;
@@ -170,13 +173,14 @@ declare module '$env/dynamic/private' {
 		npm_config_cache: string;
 		npm_lifecycle_script: string;
 		LC_CTYPE: string;
+		KITTY_WINDOW_ID: string;
 		VIMRUNTIME: string;
 		KITTY_INSTALLATION_DIR: string;
-		KITTY_WINDOW_ID: string;
 		npm_config_user_agent: string;
 		HOMEBREW_CELLAR: string;
 		INFOPATH: string;
 		VIM: string;
+		SECURITYSESSIONID: string;
 		COLORTERM: string;
 		KITTY_PUBLIC_KEY: string;
 		npm_config_prefix: string;

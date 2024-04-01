@@ -19,7 +19,7 @@
 	</div>
 </div>
 
-<style scoped>
+<style scoped lang="postcss">
 	.container_f {
 		@apply h-12 w-full bg-white;
 		box-shadow: -0.25rem -0.15rem 0.5rem 0.25rem rgba(0, 0, 0, 0.1);
