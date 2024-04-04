@@ -32,19 +32,19 @@ const connectToAllDbs = async () => {
 
 const generateRecords = async () => {
   const clients = await connectToAllDbs();
-  const maxRecords = 1600000;
+  const maxRecords = 7600000;
 
   let ind = 0;
   for (let i = 0; i < maxRecords; i++) {
     try {
-      if (ind % 5000 === 0) {
+      if (ind % 1000 === 0) {
         const done = Math.trunc((ind / maxRecords) * 100);
         console.clear();
         console.log("Migrating data... Items recorded: " + ind);
         console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
         console.log("Done: " + done + "%");
       }
-      const zipCode = faker.en.location.zipCode;
+      const zipCode = faker.en.location.zipCode();
       const stars = faker.en.number.int({ min: 2, max: 5 });
       const opensAt = faker.en.number.int({ min: 6, max: 12 });
       const closesAt = faker.en.number.int({ min: 18, max: 24 });
@@ -52,8 +52,8 @@ const generateRecords = async () => {
       const description = faker.en.lorem.paragraph();
       const email = faker.en.internet.email();
       const phone = faker.en.phone.number().toString();
-      const lat = faker.en.location.latitude();
-      const lon = faker.en.location.longitude();
+      const lat = faker.en.location.latitude({ min: -84, max: 85 });
+      const lon = faker.en.location.longitude({ min: -180, max: 180 });
       const name = faker.en.company.name();
 
       const record = Object.setPrototypeOf(
@@ -120,6 +120,7 @@ const generateRecords = async () => {
       continue;
     }
   }
+  console.clear();
   console.log("Finished migrating data. Entries created: " + ind);
 };
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import type { LatLngExpression, Map, Icon, Marker, Layer, LayerGroup } from 'leaflet';
+	import type { LatLngExpression, Map, Icon, Marker, LayerGroup } from 'leaflet';
 	import { onDestroy, onMount } from 'svelte';
 	import { Footer } from '@/components/footer';
 	import { Header } from '@/components/header';
@@ -44,10 +44,12 @@
 
 		businesses = result;
 		const markers: Marker[] = result.map((data) => {
+			const hours = new Date().getHours();
+			const isClosed = hours > data.opensAt && hours < data.closesAt;
 			return L.marker([data.lat, data.lon], {
 				icon: icons.location,
 				title: data.name,
-				opacity: data.stars < 3 ? 0.5 : 1,
+				opacity: isClosed ? 0.5 : 1,
 				riseOnHover: true
 			}).bindPopup(createBusinessPopup(data));
 		});
