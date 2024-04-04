@@ -9,9 +9,9 @@
 <Carousel.Root class="h-fit w-full">
 	<Carousel.Content>
 		{#each businesses as business}
-			<BusinessCard title={business.name} type={business.type} stars={business.stars} />
+			<Carousel.Item>
+				<BusinessCard title={business.name} type={business.type} stars={business.stars} />
+			</Carousel.Item>
 		{/each}
 	</Carousel.Content>
-	<!-- <Carousel.Previous /> -->
-	<!-- <Carousel.Next /> -->
 </Carousel.Root>

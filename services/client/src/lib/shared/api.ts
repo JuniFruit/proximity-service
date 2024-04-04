@@ -1,5 +1,6 @@
 import messageStore from '@/stores/message';
 import type { BusinessData } from '@/types/business';
+import type { LatLngExpression } from 'leaflet';
 
 const BASE_URL = 'http://localhost:3000';
 
@@ -20,7 +21,9 @@ const request = async <T = object, R = object>(
 				...headers
 			}
 		});
-		if (res.status === 500) {
+		const contentType = res.headers.get('Content-Type');
+
+		if (res.status === 500 || !contentType?.includes('application/json')) {
 			messageStore.update(() => 'Something went wrong!');
 			return null;
 		}
@@ -38,7 +41,9 @@ const request = async <T = object, R = object>(
 	}
 };
 
-export const searchBusinesses = async (lat: number, lon: number, rad = 5000) => {
+export const searchBusinesses = async (pos: LatLngExpression, rad = 2000) => {
+	if (!Array.isArray(pos)) return;
+	const [lat, lon] = pos;
 	const res = await request<null, { businesses: BusinessData[] }>(
 		`/search?lon=${lon}&lat=${lat}&radius=${rad}`
 	);

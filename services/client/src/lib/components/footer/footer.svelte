@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { Mobile, EnvelopeClosed, Gear } from 'svelte-radix';
+	import { EnvelopeClosed, Gear } from 'svelte-radix';
 	import { Button } from '@/components/ui/button/';
 </script>
 
 <div class="container_f">
 	<div class="container_inner">
 		<div class="button_container">
-			<Button disabled variant="ghost">
+			<Button variant="ghost">
 				<EnvelopeClosed />
 			</Button>
 			<Button variant="outline" size="icon">
-				<Mobile />
+				<img src="map.png" alt="map" class="h-8 w-8" />
 			</Button>
-			<Button disabled variant="ghost">
+			<Button variant="ghost">
 				<Gear />
 			</Button>
 		</div>
