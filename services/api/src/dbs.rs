@@ -43,30 +43,36 @@ impl MongoDb {
 #[serde(rename_all = "camelCase")]
 pub struct BusinessData {
     pub id: Option<u64>,
-    pub country_code: String,
     pub zip_code: String,
-    pub street: String,
     pub name: String,
     pub stars: u8,
     pub r#type: String,
-    pub city: String,
     pub lat: f32,
     pub lon: f32,
+    pub opens_at: u8,
+    pub closes_at: u8,
+    pub average_price: u8,
+    pub description: String,
+    pub email: String,
+    pub phone: String,
 }
 
 impl BusinessData {
     pub fn default() -> BusinessData {
         BusinessData {
             id: None,
-            country_code: "EN".to_string(),
             zip_code: "0".to_string(),
-            street: "null".to_string(),
             name: "null".to_string(),
             stars: 0,
             r#type: "null".to_string(),
-            city: "null".to_string(),
             lat: 0.0,
             lon: 0.0,
+            opens_at: 0,
+            closes_at: 0,
+            average_price: 0,
+            email: "".to_string(),
+            description: "".to_string(),
+            phone: "".to_string(),
         }
     }
     async fn get_business_by_id_mongo(mongo: &MongoDb, id: u32) -> Result<Option<BusinessData>> {
@@ -189,12 +195,14 @@ impl BusinessData {
                 "name" => data.name = value,
                 "lon" => data.lon = value.parse::<f32>()?,
                 "lat" => data.lat = value.parse::<f32>()?,
-                "street" => data.street = value,
                 "stars" => data.stars = value.parse::<u8>()?,
-                "zip_code" => data.zip_code = value,
-                "country_code" => data.country_code = value,
+                "zipCode" => data.zip_code = value,
                 "type" => data.r#type = value,
-                "city" => data.city = value,
+                "averagePrice" => data.average_price = value.parse::<u8>()?,
+                "opensAt" => data.opens_at = value.parse::<u8>()?,
+                "closesAt" => data.closes_at = value.parse::<u8>()?,
+                "email" => data.email = value,
+                "phone" => data.phone = value,
                 _ => continue,
             }
         }

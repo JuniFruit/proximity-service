@@ -1,26 +1,8 @@
-const fs = require("fs");
-const readline = require("readline");
 const redisDriver = require("ioredis");
 const mongoDriver = require("mongodb");
+const faker = require("@faker-js/faker").allFakers;
 
-const COUNTRIES_PATH = "./allCountries.txt";
-const NAMES = [
-  "Joes",
-  "SteakHouse",
-  "Market",
-  "Washer",
-  "Donalds",
-  "Trader",
-  "San Morto",
-  "Japanese",
-  "Chinese",
-  "Restaurant",
-  "Suns",
-  "Williams",
-  "Lakes",
-  "Fake",
-];
-const TYPES = ["restaurant", "car-wash", "diner", "motel", "hotel"];
+const TYPES = ["restaurant", "car-wash", "cafe", "hotel", "shop"];
 
 const rnd = (num) => {
   return Math.floor(Math.random() * num);
@@ -49,43 +31,46 @@ const connectToAllDbs = async () => {
 };
 
 const generateRecords = async () => {
-  const countriesStream = fs.createReadStream(COUNTRIES_PATH);
   const clients = await connectToAllDbs();
-  const maxRecords = 1553663;
-  const rl = readline.createInterface({
-    input: countriesStream,
-    crlfDelay: Infinity,
-  });
+  const maxRecords = 1600000;
 
   let ind = 0;
-  for await (const line of rl) {
+  for (let i = 0; i < maxRecords; i++) {
     try {
       if (ind % 5000 === 0) {
-        const done = (ind / maxRecords) * 100;
+        const done = Math.trunc((ind / maxRecords) * 100);
         console.clear();
         console.log("Migrating data... Items recorded: " + ind);
-        console.log("Done: " + Math.trunc(done) + "%");
+        console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
+        console.log("Done: " + done + "%");
       }
-      const splitted = line.split("\t");
-      const countryCode = splitted[0];
-      const zipCode = splitted[1];
-      const street = splitted[2];
-      const city = splitted[3];
-      const lat = +splitted[splitted.length - 3];
-      const lon = +splitted[splitted.length - 2];
+      const zipCode = faker.en.location.zipCode;
+      const stars = faker.en.number.int({ min: 2, max: 5 });
+      const opensAt = faker.en.number.int({ min: 6, max: 12 });
+      const closesAt = faker.en.number.int({ min: 18, max: 24 });
+      const averagePrice = faker.en.number.int({ min: 5, max: 25 });
+      const description = faker.en.lorem.paragraph();
+      const email = faker.en.internet.email();
+      const phone = faker.en.phone.number().toString();
+      const lat = faker.en.location.latitude();
+      const lon = faker.en.location.longitude();
+      const name = faker.en.company.name();
 
       const record = Object.setPrototypeOf(
         {
           id: ind,
-          countryCode,
           zipCode,
-          street,
-          name: NAMES[rnd(NAMES.length)] + " " + NAMES[rnd(NAMES.length)],
-          stars: rnd(5),
+          name,
+          stars,
           type: TYPES[rnd(TYPES.length)],
-          city,
           lat,
           lon,
+          opensAt,
+          closesAt,
+          averagePrice,
+          description,
+          email,
+          phone,
         },
         null,
       );
@@ -100,24 +85,30 @@ const generateRecords = async () => {
         clients.redisBusiness1.call(
           "HSET",
           record.id,
-          "country_code",
-          record.countryCode,
-          "zip_code",
-          record.zipCode,
+          "zipCode",
+          zipCode,
           "name",
-          record.name,
+          name,
           "stars",
-          record.stars,
-          "street",
-          record.street,
+          stars,
           "lat",
-          record.lat,
+          lat,
           "lon",
-          record.lon,
-          "city",
-          record.city,
+          lon,
           "type",
           record.type,
+          "averagePrice",
+          averagePrice,
+          "closesAt",
+          closesAt,
+          "opensAt",
+          opensAt,
+          "description",
+          description,
+          "email",
+          email,
+          "phone",
+          phone,
         ),
         clients.mongoDB.collection("businesses").insertOne(record),
       ];
@@ -129,6 +120,7 @@ const generateRecords = async () => {
       continue;
     }
   }
+  console.log("Finished migrating data. Entries created: " + ind);
 };
 
 function handleErr(error) {
