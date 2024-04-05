@@ -1,9 +1,15 @@
 <script lang="ts">
 	import { Star } from 'svelte-radix';
 	import { SH4, Small } from '@/components/ui/typography';
+	import windowStore from '@/stores/window';
 	export let stars: number = 0;
 	export let title: string;
 	export let type: string;
+	let isMobile: boolean;
+
+	windowStore.subscribe((data) => {
+		isMobile = data;
+	});
 
 	function stripTitle(str: string, max = 21) {
 		if (!str) return '';
@@ -21,7 +27,7 @@
 	</div>
 	<div class="body_container">
 		<div class="flex flex-col gap-2">
-			<SH4>{stripTitle(title)}</SH4>
+			<SH4>{stripTitle(title, isMobile ? 21 : 40)}</SH4>
 			<div class="stars_container">
 				{#each Array(stars) as _}
 					<Star class="h-3 w-3 text-emerald-500" />

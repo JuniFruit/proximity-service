@@ -15,6 +15,7 @@
 		setupIcons
 	} from '@/shared/general';
 	import messageStore from '@/stores/message';
+	import windowStore from '@/stores/window';
 
 	let L: any;
 	let map: Map;
@@ -26,6 +27,7 @@
 	let icons: Record<string, Icon>;
 	let currentPosMarker: Marker;
 	let businessLayerGroup: LayerGroup;
+	let resizeEventId: number;
 
 	function init(container: HTMLElement) {
 		map = createMap(container, L);
@@ -62,7 +64,7 @@
 		const lon = pos.coords.longitude;
 		currentView = [lat, lon];
 		map.setView(currentView, defaultZoom);
-		searchBusinesses(currentView).then(onBusinessesFound);
+		searchBusinesses(currentView, 2000).then(onBusinessesFound);
 		updateNavMarker();
 	}
 
@@ -78,18 +80,27 @@
 		}
 	}
 
+	function onWindowResize() {
+		const isMobile = window.innerWidth <= 800 && window.innerHeight <= 600;
+		windowStore.update(() => isMobile);
+	}
+
 	onMount(async () => {
 		if (browser) {
 			L = await import('leaflet');
 			if (mapContainer) {
 				init(mapContainer);
 			}
+			window.addEventListener('resize', onWindowResize);
 		}
 	});
 
 	onDestroy(() => {
 		if (watchPosId) {
 			navigator.geolocation.clearWatch(watchPosId);
+		}
+		if (browser) {
+			window.removeEventListener('resize', onWindowResize);
 		}
 	});
 </script>

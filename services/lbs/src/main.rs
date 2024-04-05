@@ -118,7 +118,10 @@ async fn handle_get_area_businesses<'a>(
         let mut single_item: BusinessData =
             conns.redis_business.connection.hgetall(&ids[0]).await?;
         single_item.id = Some(ids[0].parse::<u64>()?);
-        return Ok(Response::success(json!({"businesses": single_item}), None));
+        return Ok(Response::success(
+            json!({"businesses": vec![single_item]}),
+            None,
+        ));
     }
 
     let mut pipe = Pipeline::new();

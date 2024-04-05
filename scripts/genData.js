@@ -1,12 +1,34 @@
 const redisDriver = require("ioredis");
+const readline = require("readline");
 const mongoDriver = require("mongodb");
+const fs = require("fs");
 const faker = require("@faker-js/faker").allFakers;
 
 const TYPES = ["restaurant", "car-wash", "cafe", "hotel", "shop"];
+const maxBusinessPerCity = 70;
 
 const rnd = (num) => {
   return Math.floor(Math.random() * num);
 };
+
+function randomGeo(center, radius) {
+  var y0 = center.latitude;
+  var x0 = center.longitude;
+  var rd = radius / 111300;
+
+  var u = Math.random();
+  var v = Math.random();
+
+  var w = rd * Math.sqrt(u);
+  var t = 2 * Math.PI * v;
+  var x = w * Math.cos(t);
+  var y = w * Math.sin(t);
+
+  return {
+    latitude: y + y0,
+    longitude: x + x0,
+  };
+}
 
 const connectToAllDbs = async () => {
   const redisGeo1 = new redisDriver({
@@ -30,20 +52,18 @@ const connectToAllDbs = async () => {
   };
 };
 
-const generateRecords = async () => {
-  const clients = await connectToAllDbs();
-  const maxRecords = 7600000;
+const generateData = async (line, clients) => {
+  const [_, __, latitude, longitude] = line.split(",");
+  let created = 0;
+  const center = {
+    latitude: parseFloat(latitude?.replaceAll('"', "")),
+    longitude: parseFloat(longitude?.replaceAll('"', "")),
+  };
 
-  let ind = 0;
-  for (let i = 0; i < maxRecords; i++) {
+  for (let i = 0; i < maxBusinessPerCity; i++) {
     try {
-      if (ind % 1000 === 0) {
-        const done = Math.trunc((ind / maxRecords) * 100);
-        console.clear();
-        console.log("Migrating data... Items recorded: " + ind);
-        console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
-        console.log("Done: " + done + "%");
-      }
+      const { latitude: lat, longitude: lon } = randomGeo(center, 12000);
+      if (!lat || !lon) continue;
       const zipCode = faker.en.location.zipCode();
       const stars = faker.en.number.int({ min: 2, max: 5 });
       const opensAt = faker.en.number.int({ min: 6, max: 12 });
@@ -52,13 +72,12 @@ const generateRecords = async () => {
       const description = faker.en.lorem.paragraph();
       const email = faker.en.internet.email();
       const phone = faker.en.phone.number().toString();
-      const lat = faker.en.location.latitude({ min: -84, max: 85 });
-      const lon = faker.en.location.longitude({ min: -180, max: 180 });
       const name = faker.en.company.name();
+      const id = faker.en.seed();
 
       const record = Object.setPrototypeOf(
         {
-          id: ind,
+          id,
           zipCode,
           name,
           stars,
@@ -113,6 +132,40 @@ const generateRecords = async () => {
         clients.mongoDB.collection("businesses").insertOne(record),
       ];
       await Promise.all(promises);
+      created++;
+    } catch (error) {
+      handleErr(error);
+      continue;
+    }
+  }
+  return created;
+};
+
+const generateRecords = async () => {
+  const clients = await connectToAllDbs();
+  const maxRecords = 47868;
+  let ind = 0;
+  let created = 0;
+
+  const fileStream = fs.createReadStream("./worldcities.csv");
+  fileStream.le;
+
+  let lineReader = require("readline").createInterface({
+    input: fs.createReadStream("./worldcities.csv"),
+  });
+
+  for await (const line of lineReader) {
+    if (ind % 50 == 0) {
+      const done = Math.trunc((ind / maxRecords) * 100);
+      console.clear();
+      console.log("Migrating data... \nLines processed: " + ind);
+      console.log("Item recorded: " + created);
+      console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
+      console.log("Done: " + done + "%");
+    }
+
+    try {
+      created += await generateData(line, clients);
       ind++;
     } catch (error) {
       handleErr(error);
@@ -120,12 +173,14 @@ const generateRecords = async () => {
       continue;
     }
   }
+
   console.clear();
-  console.log("Finished migrating data. Entries created: " + ind);
+  console.log("Finished migrating data. Entries created: " + created);
+  process.exit(1);
 };
 
 function handleErr(error) {
-  console.error("Failed to add record" + ". Reason: " + error.message);
+  console.log("Failed to create entry. Reason: " + error.message);
 }
 
 generateRecords();

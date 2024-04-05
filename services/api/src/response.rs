@@ -1,5 +1,8 @@
 use serde_json::{json, Value};
-use std::{error::Error, fmt};
+use std::{
+    error::Error,
+    fmt::{self, format},
+};
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n";
 const BAD_REQUEST: &str = "HTTP/1.1 400 BAD_REQUEST\r\nContent-Type: application/json\r\n";
@@ -69,14 +72,23 @@ impl Response {
         self.construct_response_string(INTERNAL_SERVER_ERROR)
     }
     fn construct_response_string(&self, response_type: &str) -> String {
+        let allow_origin = "Access-Control-Allow-Origin: *\r\n".to_string();
+        let allow_methods = "Access-Control-Allow-Methods: GET, POST, PUT\r\n".to_string();
+        let allow_headers = "Access-Control-Allow-Headers: DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range\r\n".to_string();
         let content_length = format!(
             "Content-Length: {}\r\n\r\n",
             self.body.to_string().as_bytes().len()
         );
         let server = format!("Server: {}\r\n", "Rust");
         let response = format!(
-            "{}{}{}{}\r\n\r\n",
-            response_type, server, content_length, self.body
+            "{}{}{}{}{}{}{}\r\n\r\n",
+            response_type,
+            server,
+            allow_origin,
+            allow_methods,
+            allow_headers,
+            content_length,
+            self.body
         );
         response
     }
