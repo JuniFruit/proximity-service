@@ -1,5 +1,4 @@
 const redisDriver = require("ioredis");
-const readline = require("readline");
 const mongoDriver = require("mongodb");
 const fs = require("fs");
 const faker = require("@faker-js/faker").allFakers;
@@ -49,6 +48,7 @@ const connectToAllDbs = async () => {
     redisGeo1,
     redisBusiness1,
     mongoDB,
+    mongoInstance: mongo1,
   };
 };
 
@@ -175,7 +175,12 @@ const generateRecords = async () => {
   }
 
   console.clear();
+  console.log("Closing connections...");
+  await clients.mongoInstance.close();
+  await clients.redisGeo1.disconnect();
+  await clients.redisBusiness1.disconnect();
   console.log("Finished migrating data. Entries created: " + created);
+
   process.exit(1);
 };
 

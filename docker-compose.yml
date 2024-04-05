@@ -26,6 +26,8 @@ services:
     restart: always
     ports:
       - "6378:6379"
+    volumes:
+      - redis_data:/data
   mongo:
     image: mongo
     restart: always
@@ -68,3 +70,5 @@ services:
 networks:
   proximity:
     driver: bridge
+volumes:
+  redis_data:

@@ -27,6 +27,7 @@
  */
 declare module '$env/static/private' {
 	export const MANPATH: string;
+	export const TERM_PROGRAM: string;
 	export const NODE: string;
 	export const INIT_CWD: string;
 	export const TERM: string;
@@ -35,13 +36,13 @@ declare module '$env/static/private' {
 	export const TMPDIR: string;
 	export const HOMEBREW_REPOSITORY: string;
 	export const npm_config_global_prefix: string;
-	export const MallocSpaceEfficient: string;
+	export const TERM_PROGRAM_VERSION: string;
 	export const WINDOWID: string;
 	export const COLOR: string;
+	export const TERM_SESSION_ID: string;
 	export const npm_config_noproxy: string;
 	export const npm_config_local_prefix: string;
 	export const USER: string;
-	export const COMMAND_MODE: string;
 	export const npm_config_globalconfig: string;
 	export const SSH_AUTH_SOCK: string;
 	export const __CF_USER_TEXT_ENCODING: string;
@@ -50,6 +51,7 @@ declare module '$env/static/private' {
 	export const npm_package_json: string;
 	export const npm_config_engine_strict: string;
 	export const _: string;
+	export const LaunchInstanceID: string;
 	export const npm_config_userconfig: string;
 	export const npm_config_init_module: string;
 	export const __CFBundleIdentifier: string;
@@ -75,13 +77,15 @@ declare module '$env/static/private' {
 	export const npm_config_cache: string;
 	export const LOGNAME: string;
 	export const npm_lifecycle_script: string;
+	export const LC_CTYPE: string;
 	export const npm_config_user_agent: string;
-	export const KITTY_WINDOW_ID: string;
 	export const KITTY_INSTALLATION_DIR: string;
 	export const VIMRUNTIME: string;
+	export const KITTY_WINDOW_ID: string;
 	export const INFOPATH: string;
 	export const HOMEBREW_CELLAR: string;
 	export const VIM: string;
+	export const SECURITYSESSIONID: string;
 	export const npm_node_execpath: string;
 	export const npm_config_prefix: string;
 	export const KITTY_PUBLIC_KEY: string;
@@ -119,6 +123,7 @@ declare module '$env/static/public' {
 declare module '$env/dynamic/private' {
 	export const env: {
 		MANPATH: string;
+		TERM_PROGRAM: string;
 		NODE: string;
 		INIT_CWD: string;
 		TERM: string;
@@ -127,13 +132,13 @@ declare module '$env/dynamic/private' {
 		TMPDIR: string;
 		HOMEBREW_REPOSITORY: string;
 		npm_config_global_prefix: string;
-		MallocSpaceEfficient: string;
+		TERM_PROGRAM_VERSION: string;
 		WINDOWID: string;
 		COLOR: string;
+		TERM_SESSION_ID: string;
 		npm_config_noproxy: string;
 		npm_config_local_prefix: string;
 		USER: string;
-		COMMAND_MODE: string;
 		npm_config_globalconfig: string;
 		SSH_AUTH_SOCK: string;
 		__CF_USER_TEXT_ENCODING: string;
@@ -142,6 +147,7 @@ declare module '$env/dynamic/private' {
 		npm_package_json: string;
 		npm_config_engine_strict: string;
 		_: string;
+		LaunchInstanceID: string;
 		npm_config_userconfig: string;
 		npm_config_init_module: string;
 		__CFBundleIdentifier: string;
@@ -167,13 +173,15 @@ declare module '$env/dynamic/private' {
 		npm_config_cache: string;
 		LOGNAME: string;
 		npm_lifecycle_script: string;
+		LC_CTYPE: string;
 		npm_config_user_agent: string;
-		KITTY_WINDOW_ID: string;
 		KITTY_INSTALLATION_DIR: string;
 		VIMRUNTIME: string;
+		KITTY_WINDOW_ID: string;
 		INFOPATH: string;
 		HOMEBREW_CELLAR: string;
 		VIM: string;
+		SECURITYSESSIONID: string;
 		npm_node_execpath: string;
 		npm_config_prefix: string;
 		KITTY_PUBLIC_KEY: string;
