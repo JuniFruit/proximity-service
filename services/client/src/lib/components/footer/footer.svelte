@@ -1,12 +1,19 @@
 <script lang="ts">
 	import { EnvelopeClosed, Gear } from 'svelte-radix';
 	import { Button } from '@/components/ui/button/';
+	import { createEventDispatcher } from 'svelte';
+
+	const dispatch = createEventDispatcher();
+
+	function onSimMoveCalled() {
+		dispatch('simMove');
+	}
 </script>
 
 <div class="container_f">
 	<div class="container_inner">
 		<div class="button_container">
-			<Button variant="ghost">
+			<Button variant="ghost" on:click={onSimMoveCalled}>
 				<EnvelopeClosed />
 			</Button>
 			<Button variant="outline" size="icon">

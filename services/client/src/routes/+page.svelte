@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import type { LatLngExpression, Map, Icon, Marker, LayerGroup } from 'leaflet';
+	import type { LatLngExpression, Map, Icon, Marker } from 'leaflet';
 	import { onDestroy, onMount } from 'svelte';
 	import { Footer } from '@/components/footer';
 	import { Header } from '@/components/header';
@@ -10,66 +10,132 @@
 	import {
 		createBusinessPopup,
 		createMap,
+		findDistanceBetweenPoints,
 		getUserGeo,
 		initialMapOpts,
 		setupIcons
 	} from '@/shared/general';
 	import messageStore from '@/stores/message';
 	import windowStore from '@/stores/window';
+	import uiStore from '@/stores/ui';
+	import type { UIStore } from '@/types/stores';
 
 	let L: any;
 	let map: Map;
 	let mapContainer: HTMLDivElement;
-	let businesses: BusinessData[] = [];
+	let businesses: Record<string, BusinessData> = {};
 	let currentView: LatLngExpression = initialMapOpts.center!;
-	let defaultZoom = 16.5;
+	let defaultZoom = 15.5;
 	let watchPosId: number;
 	let icons: Record<string, Icon>;
 	let currentPosMarker: Marker;
-	let businessLayerGroup: LayerGroup;
-	let resizeEventId: number;
+	let maxVisibleRadius = 5000; // businesses that outside will be freed
+	let movingInterval: number;
+	let businessMarkers: Record<string, Marker> = {};
+	let isTrackingView = false;
+	let uiStoreData: UIStore;
+	let prevSelectedBusiness: number = 0;
+
+	uiStore.subscribe((data) => {
+		uiStoreData = data;
+	});
+
+	$: {
+		if (uiStoreData.businessSelected && uiStoreData.businessSelected !== prevSelectedBusiness) {
+			isTrackingView = false;
+			const key = uiStoreData.businessSelected;
+			prevSelectedBusiness = key;
+			if (businesses[key]) {
+				const { lat, lon } = businesses[key];
+				map.setView([lat, lon]);
+			}
+		}
+	}
 
 	function init(container: HTMLElement) {
 		map = createMap(container, L);
-		watchPosId = getUserGeo(onPosChanged);
+		watchPosId = getUserGeo((pos) => onPosChanged(pos, true));
 		icons = setupIcons(L);
+		map.setZoom(defaultZoom);
+		map.on('drag', () => {
+			isTrackingView = false;
+		});
+	}
+
+	function simulateMovement() {
+		if (movingInterval) {
+			clearInterval(movingInterval);
+		}
+		movingInterval = setInterval(() => {
+			const updatedLat = (currentView as unknown as [number, number])[0] + 0.001;
+			const updatedLon = (currentView as unknown as [number, number])[1] + 0.001;
+			onPosChanged({
+				coords: {
+					latitude: updatedLat,
+					longitude: updatedLon
+				}
+			});
+		}, 500);
+	}
+
+	function createBusinessMarker(data: BusinessData): Marker {
+		const hours = new Date().getHours();
+		const isOpenNow = hours >= data.opensAt && hours <= data.closesAt;
+		return L.marker([data.lat, data.lon], {
+			icon: icons.location,
+			title: data.name,
+			opacity: isOpenNow ? 1 : 0.5,
+			riseOnHover: true
+		})
+			.bindPopup(createBusinessPopup(data, !isOpenNow))
+			.addTo(map);
 	}
 
 	function onBusinessesFound(res?: BusinessData[]) {
 		const result = res || [];
-		if (!result.length) {
+		if (!result.length && !Object.keys(businesses).length) {
 			messageStore.update(() => 'Nothing was found in this area');
 		}
-		if (businessLayerGroup) {
-			map.removeLayer(businessLayerGroup);
-		}
 
-		businesses = result;
-		const markers: Marker[] = result.map((data) => {
-			const hours = new Date().getHours();
-			const isClosed = hours > data.opensAt && hours < data.closesAt;
-			return L.marker([data.lat, data.lon], {
-				icon: icons.location,
-				title: data.name,
-				opacity: isClosed ? 0.5 : 1,
-				riseOnHover: true
-			}).bindPopup(createBusinessPopup(data));
+		// normalize;
+		const newBusinesses = { ...businesses };
+
+		result.forEach((item) => {
+			const key = item.id;
+			if (!businessMarkers[key]) {
+				businessMarkers[key] = createBusinessMarker(item);
+			}
+
+			newBusinesses[key] = item;
 		});
-		businessLayerGroup = L.layerGroup(markers);
-		map.addLayer(businessLayerGroup);
+		// remove items outside radius
+		Object.keys(newBusinesses).forEach((key) => {
+			const { lat, lon } = newBusinesses[key];
+			const isOutside = findDistanceBetweenPoints(currentView, [lat, lon]) > maxVisibleRadius;
+			if (isOutside) {
+				businessMarkers[key].remove();
+				delete businessMarkers[key];
+				delete newBusinesses[key];
+			}
+		});
+
+		businesses = newBusinesses;
 	}
 
-	function onPosChanged(pos: any) {
-		const lat = pos.coords.latitude;
-		const lon = pos.coords.longitude;
+	function onPosChanged(pos: any, isSetView = false) {
+		const lat = parseFloat(pos.coords.latitude);
+		const lon = parseFloat(pos.coords.longitude);
 		currentView = [lat, lon];
-		map.setView(currentView, defaultZoom);
-		searchBusinesses(currentView, 2000).then(onBusinessesFound);
+		searchBusinesses(currentView).then(onBusinessesFound);
 		updateNavMarker();
+		if (isTrackingView || isSetView) {
+			map.setView(currentView);
+		}
 	}
 
 	function setOnCurrentPos() {
-		map.setView(currentView, defaultZoom);
+		map.setView(currentView);
+		isTrackingView = true;
 	}
 
 	function updateNavMarker() {
@@ -92,6 +158,7 @@
 				init(mapContainer);
 			}
 			window.addEventListener('resize', onWindowResize);
+			onWindowResize();
 		}
 	});
 
@@ -102,6 +169,7 @@
 		if (browser) {
 			window.removeEventListener('resize', onWindowResize);
 		}
+		clearInterval(movingInterval);
 	});
 </script>
 
@@ -119,10 +187,10 @@
 	</div>
 	<div id="map" bind:this={mapContainer} />
 	<div class="carousel_container">
-		<BusinessCarousel {businesses} />
+		<BusinessCarousel businesses={Object.values(businesses)} />
 	</div>
 	<div class="footer_container">
-		<Footer />
+		<Footer on:simMove={simulateMovement} />
 	</div>
 </div>
 
