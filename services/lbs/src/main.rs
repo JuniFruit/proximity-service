@@ -12,10 +12,9 @@ use redis::{
 use request::{parse_tcp_stream, Request};
 use response::Response;
 use serde_json::json;
-use std::{
-    io::Write,
-    net::{TcpListener, TcpStream},
-};
+use std::io::Write;
+use std::net::{TcpListener, TcpStream};
+use std::time::Instant;
 
 use crate::dbs::BusinessData;
 
@@ -28,7 +27,6 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.port))
         .expect("Server failed to start at {config.port}");
     println!("Server is listening at {}", config.port);
-
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -45,12 +43,15 @@ async fn main() -> Result<()> {
 
 async fn handle_tcp_stream(mut stream: TcpStream, connections: &mut DBConnections) -> usize {
     let mut req = Request::default();
+
     parse_tcp_stream(&mut stream, &mut req);
     let response = handle_request(&req, connections).await;
+    let start_time = Instant::now();
 
     match response {
         Ok(res) => {
-            println!("{:?}", res.to_response_string());
+            println!("Time took: {:?}", start_time.elapsed());
+            println!("Response status: {:?}", res.status);
 
             stream
                 .write(res.to_response_string().as_bytes())
@@ -72,11 +73,6 @@ async fn handle_request<'a>(
     if req.matched_path.is_none() {
         return Ok(Response::not_found(None));
     }
-    println!(
-        "{} {} was requested",
-        req.method.as_ref().unwrap(),
-        req.path.as_ref().unwrap()
-    );
 
     match req.matched_path.unwrap() {
         "GET /search" => handle_get_area_businesses(req, connections).await,

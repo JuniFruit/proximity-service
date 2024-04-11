@@ -67,15 +67,15 @@
 			clearInterval(movingInterval);
 		}
 		movingInterval = setInterval(() => {
-			const updatedLat = (currentView as unknown as [number, number])[0] + 0.001;
-			const updatedLon = (currentView as unknown as [number, number])[1] + 0.001;
+			const updatedLat = (currentView as unknown as [number, number])[0] + 0.0001;
+			const updatedLon = (currentView as unknown as [number, number])[1] + 0.0001;
 			onPosChanged({
 				coords: {
 					latitude: updatedLat,
 					longitude: updatedLon
 				}
 			});
-		}, 500);
+		}, 1000);
 	}
 
 	function createBusinessMarker(data: BusinessData): Marker {

@@ -11,6 +11,11 @@ services:
     environment:
       - LBS_SERVER_HOST
       - API_SERVER_HOST
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "3"
 
   redis-geo:
     image: redis/redis-stack
@@ -19,6 +24,7 @@ services:
       - proximity
     ports:
       - "6377:6379"
+
   redis-business-info:
     image: redis:7.0
     networks:
@@ -38,6 +44,7 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD
     ports:
       - "27017:27017"
+
   api:
     networks:
       - proximity
@@ -52,6 +59,11 @@ services:
     environment:
       - MONGO_URI
       - REDIS_BUSINESS_URI
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "3"
 
   lbs:
     networks:
@@ -67,6 +79,11 @@ services:
     environment:
       - REDIS_GEO_URI
       - REDIS_BUSINESS_URI
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "3"
 networks:
   proximity:
     driver: bridge

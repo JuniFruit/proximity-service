@@ -12,6 +12,7 @@ use response::Result;
 use router::Router;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
+use std::time::Instant;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -43,13 +44,10 @@ async fn handle_tcp_stream<'a>(
 ) {
     println!("New incoming request...");
     let mut req: Request = Request::default();
+    let start_time = Instant::now();
     parse_tcp_stream(&mut stream, &mut req);
     let response = handle_request(&mut req, router, db_clients).await;
-    println!(
-        "{} {} was requested",
-        req.method.unwrap(),
-        req.path.unwrap()
-    );
+    println!("Time took {:?}", start_time.elapsed());
     stream
         .write_all(response.as_bytes())
         .expect("Failed to write back")

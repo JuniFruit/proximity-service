@@ -44,6 +44,8 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
         return;
     }
 
+    println!("Raw: {:?}", request_raw);
+
     let mut rows = request_raw.split("\r\n").collect::<VecDeque<&str>>();
     let mut ind = 0;
 

@@ -45,6 +45,8 @@ pub fn parse_tcp_stream(stream: &mut TcpStream, request_struct: &mut Request) {
         return;
     }
 
+    println!("Raw: {:?}", request_raw);
+
     let mut rows = request_raw.split("\r\n").collect::<VecDeque<&str>>();
     let mut ind = 0;
 
@@ -97,7 +99,10 @@ pub async fn handle_request<'a>(
     let response = router.handle_route(req, conns).await;
 
     match response {
-        Ok(res) => res.to_response_string(),
+        Ok(res) => {
+            println!("Response status: {:?}", res.status);
+            res.to_response_string()
+        }
         Err(e) => {
             println!("{:?}", e);
             Response::internal(None).to_response_string()
