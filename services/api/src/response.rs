@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::{
     error::Error,
-    fmt::{self, format},
+    fmt::{self},
 };
 
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n";

@@ -8,16 +8,19 @@ use std::collections::HashMap;
 pub struct DBConnections {
     pub mongo: MongoDb,
     pub redis_business: RedisBusiness,
+    pub redis_geo: RedisGeo,
 }
 
 impl DBConnections {
     pub async fn init(config: &ServerConfig) -> Result<DBConnections> {
         let mongo = MongoDb::connect(&config.mongo).await?;
         let redis_business = RedisBusiness::connect(&config.redis_business).await?;
+        let redis_geo = RedisGeo::connect(&config.redis_geo).await?;
 
         Ok(DBConnections {
             mongo,
             redis_business,
+            redis_geo,
         })
     }
 }
@@ -118,6 +121,10 @@ impl BusinessData {
     pub async fn create_business(dbs: &mut DBConnections, mut data: BusinessData) -> Result<u64> {
         let inserted_id = BusinessData::create_business_mongo(&dbs.mongo, &mut data).await?;
         BusinessData::cache_business_data(&mut dbs.redis_business, &data).await?;
+        dbs.redis_geo
+            .connection
+            .geo_add("world", (data.lon, data.lat, inserted_id))
+            .await?;
         Ok(inserted_id)
     }
 
@@ -257,5 +264,18 @@ impl RedisBusiness {
 
         self.connection.hset_multiple(key, &values).await?;
         Ok(())
+    }
+}
+
+pub struct RedisGeo {
+    connection: redis::aio::MultiplexedConnection,
+}
+
+impl RedisGeo {
+    pub async fn connect(conn_str: &str) -> Result<RedisGeo> {
+        let client = redis::Client::open(conn_str).unwrap();
+        let connection = client.get_multiplexed_async_connection().await.unwrap();
+
+        Ok(RedisGeo { connection })
     }
 }
