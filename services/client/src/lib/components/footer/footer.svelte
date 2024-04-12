@@ -1,27 +1,25 @@
 <script lang="ts">
-	import { EnvelopeClosed, Gear } from 'svelte-radix';
+	import uiStore from '@/stores/ui';
 	import { Button } from '@/components/ui/button/';
 	import { createEventDispatcher } from 'svelte';
+	import { Actions } from '@/components/actions';
+	import { ConfigDialog } from '../config-dialog';
 
 	const dispatch = createEventDispatcher();
 
 	function onSimMoveCalled() {
-		dispatch('simMove');
+		dispatch('simulateMovement');
 	}
 </script>
 
 <div class="container_f">
 	<div class="container_inner">
 		<div class="button_container">
-			<Button variant="ghost" on:click={onSimMoveCalled}>
-				<EnvelopeClosed />
-			</Button>
-			<Button variant="outline" size="icon">
+			<Actions on:simulateMovement={onSimMoveCalled} />
+			<Button disabled={$uiStore.isChoosingPoint} variant="outline" size="icon">
 				<img src="map.png" alt="map" class="h-8 w-8" />
 			</Button>
-			<Button variant="ghost">
-				<Gear />
-			</Button>
+			<ConfigDialog />
 		</div>
 	</div>
 </div>

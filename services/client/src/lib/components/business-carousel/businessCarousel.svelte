@@ -3,29 +3,17 @@
 	import type { BusinessData } from '@/types/business.d';
 	import * as Carousel from '@/components/ui/carousel';
 	import windowStore from '@/stores/window';
-	import type { UIStore } from '@/types/stores';
 	import uiStore from '@/stores/ui';
 
 	export let businesses: BusinessData[] = [];
-
-	let uiStoreData: UIStore;
-	let isMobile: boolean;
-
-	uiStore.subscribe((data) => {
-		uiStoreData = data;
-	});
-
-	windowStore.subscribe((data) => {
-		isMobile = data;
-	});
 </script>
 
 <Carousel.Root class="h-fit w-full">
 	<Carousel.Content>
 		{#each businesses as business (business.id)}
-			<Carousel.Item class={!isMobile ? 'basis-1/2' : ''}>
+			<Carousel.Item class={!$windowStore ? 'basis-1/2' : 'basis-0'}>
 				<BusinessCard
-					isSelected={uiStoreData.businessSelected === business.id}
+					isSelected={$uiStore.businessSelected === business.id}
 					id={business.id}
 					opensAt={business.opensAt}
 					closesAt={business.closesAt}

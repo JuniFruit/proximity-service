@@ -1,4 +1,6 @@
 <script lang="ts">
+	import uiStore from '@/stores/ui';
+	import configStore from '@/stores/config';
 	import { browser } from '$app/environment';
 	import type { LatLngExpression, Map, Icon, Marker } from 'leaflet';
 	import { onDestroy, onMount } from 'svelte';
@@ -17,8 +19,7 @@
 	} from '@/shared/general';
 	import messageStore from '@/stores/message';
 	import windowStore from '@/stores/window';
-	import uiStore from '@/stores/ui';
-	import type { UIStore } from '@/types/stores';
+	import { Button } from '@/components/ui/button';
 
 	let L: any;
 	let map: Map;
@@ -29,21 +30,17 @@
 	let watchPosId: number;
 	let icons: Record<string, Icon>;
 	let currentPosMarker: Marker;
-	let maxVisibleRadius = 5000; // businesses that outside will be freed
 	let movingInterval: number;
 	let businessMarkers: Record<string, Marker> = {};
 	let isTrackingView = false;
-	let uiStoreData: UIStore;
 	let prevSelectedBusiness: number = 0;
-
-	uiStore.subscribe((data) => {
-		uiStoreData = data;
-	});
+	let targetMarker: Marker;
+	let lastView: LatLngExpression = initialMapOpts.center!;
 
 	$: {
-		if (uiStoreData.businessSelected && uiStoreData.businessSelected !== prevSelectedBusiness) {
+		if ($uiStore.businessSelected && $uiStore.businessSelected !== prevSelectedBusiness) {
 			isTrackingView = false;
-			const key = uiStoreData.businessSelected;
+			const key = $uiStore.businessSelected;
 			prevSelectedBusiness = key;
 			if (businesses[key]) {
 				const { lat, lon } = businesses[key];
@@ -62,13 +59,44 @@
 		});
 	}
 
-	function simulateMovement() {
-		if (movingInterval) {
+	function onSimMovementCalled() {
+		if (movingInterval && $uiStore.isSimMoving) {
 			clearInterval(movingInterval);
+			targetMarker && targetMarker.remove();
+			uiStore.update((data) => {
+				data.isSimMoving = false;
+				return data;
+			});
+			return;
 		}
+
+		uiStore.update((data) => {
+			data.isChoosingPoint = true;
+			data.onPosConfirmed = simulateMovement;
+			return data;
+		});
+	}
+
+	function simulateMovement(target: [number, number]) {
+		uiStore.update((data) => {
+			data.isSimMoving = true;
+			return data;
+		});
 		movingInterval = setInterval(() => {
-			const updatedLat = (currentView as unknown as [number, number])[0] + 0.0001;
-			const updatedLon = (currentView as unknown as [number, number])[1] + 0.0001;
+			const lat1 = (currentView as unknown as [number, number])[0];
+			const lon1 = (currentView as unknown as [number, number])[1];
+			const lat2 = target[0];
+			const lon2 = target[1];
+			const isClose = findDistanceBetweenPoints([lat1, lon1], [lat2, lon2]) < 10;
+			if (isClose) {
+				onSimMovementCalled();
+				return;
+			}
+			const dlat = lat2 - lat1;
+			const dlon = lon2 - lon1;
+			const angle = Math.atan2(dlat, dlon); // range (-PI, PI]
+			const updatedLat = lat1 + 0.0001 * Math.sin(angle);
+			const updatedLon = lon1 + 0.0001 * Math.cos(angle);
 			onPosChanged({
 				coords: {
 					latitude: updatedLat,
@@ -111,7 +139,8 @@
 		// remove items outside radius
 		Object.keys(newBusinesses).forEach((key) => {
 			const { lat, lon } = newBusinesses[key];
-			const isOutside = findDistanceBetweenPoints(currentView, [lat, lon]) > maxVisibleRadius;
+			const isOutside =
+				findDistanceBetweenPoints(currentView, [lat, lon]) > $configStore.maxVisibleRadius;
 			if (isOutside) {
 				businessMarkers[key].remove();
 				delete businessMarkers[key];
@@ -120,17 +149,37 @@
 		});
 
 		businesses = newBusinesses;
+		lastView = currentView;
 	}
 
 	function onPosChanged(pos: any, isSetView = false) {
 		const lat = parseFloat(pos.coords.latitude);
 		const lon = parseFloat(pos.coords.longitude);
 		currentView = [lat, lon];
-		searchBusinesses(currentView).then(onBusinessesFound);
+		if (findDistanceBetweenPoints(lastView, currentView) >= $configStore.requestDebounceRadius) {
+			searchBusinesses(currentView, $configStore.requestRadius).then(onBusinessesFound);
+		}
 		updateNavMarker();
 		if (isTrackingView || isSetView) {
 			map.setView(currentView);
 		}
+	}
+
+	function onConfirmPos() {
+		const center = map.getCenter();
+		targetMarker = L.marker(center, { icon: icons.destination, riseOnHover: true }).addTo(map);
+		uiStore.update((data) => {
+			data.isChoosingPoint = false;
+			data.onPosConfirmed?.([center.lat, center.lng]);
+			return data;
+		});
+	}
+
+	function onCancelPos() {
+		uiStore.update((data) => {
+			data.isChoosingPoint = false;
+			return data;
+		});
 	}
 
 	function setOnCurrentPos() {
@@ -185,13 +234,29 @@
 	<div class="header_contianer">
 		<Header on:findMe={setOnCurrentPos} />
 	</div>
-	<div id="map" bind:this={mapContainer} />
+	<div id="map" bind:this={mapContainer}>
+		{#if $uiStore.isChoosingPoint}
+			<div class="absolute left-1/2 top-1/2 z-[1000] -translate-x-1/2 -translate-y-1/2">
+				<img src="./destination.png" alt="point" class="mb-6 h-8 w-8" />
+			</div>
+		{/if}
+	</div>
 	<div class="carousel_container">
 		<BusinessCarousel businesses={Object.values(businesses)} />
 	</div>
 	<div class="footer_container">
-		<Footer on:simMove={simulateMovement} />
+		<Footer on:simulateMovement={onSimMovementCalled} />
 	</div>
+	{#if $uiStore.isChoosingPoint}
+		<div class="confirm_container">
+			<div
+				class="flex max-w-[425] items-center justify-between gap-3 rounded-lg bg-white px-4 py-2 shadow-lg"
+			>
+				<Button on:click={onConfirmPos}>Confirm</Button>
+				<Button on:click={onCancelPos} variant="secondary">Cancel</Button>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style scoped lang="postcss">
@@ -199,6 +264,10 @@
 		height: 95%;
 		width: 100%;
 		z-index: 10;
+	}
+	.confirm_container {
+		@apply absolute left-1/2 top-2/3 z-40;
+		transform: translate(-50%, -0%);
 	}
 	.page_container {
 		@apply relative h-full w-full;
