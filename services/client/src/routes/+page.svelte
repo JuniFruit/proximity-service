@@ -200,6 +200,10 @@
 		windowStore.update(() => isMobile);
 	}
 
+	function onLocationSelected(pos: CustomEvent<[number, number]>) {
+		onPosChanged({ coords: { latitude: pos.detail[0], longitude: pos.detail[1] } }, true);
+	}
+
 	onMount(async () => {
 		if (browser) {
 			L = await import('leaflet');
@@ -232,7 +236,7 @@
 </svelte:head>
 <div class="page_container">
 	<div class="header_contianer">
-		<Header on:findMe={setOnCurrentPos} />
+		<Header on:findMe={setOnCurrentPos} on:locationSelected={onLocationSelected} />
 	</div>
 	<div id="map" bind:this={mapContainer}>
 		{#if $uiStore.isChoosingPoint}
