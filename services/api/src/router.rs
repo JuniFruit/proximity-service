@@ -1,4 +1,5 @@
 use crate::dbs::{BusinessData, DBConnections};
+use crate::path_finder::Node;
 use crate::response::{Response, Result};
 use crate::Request;
 use serde_json::json;
@@ -15,6 +16,7 @@ impl<'a> Router<'a> {
             "GET /api/business/:id",
             "PUT /api/business/:id",
             "POST /api/business",
+            "POST /api/createRoute",
         ];
 
         Router { routes }
@@ -39,6 +41,7 @@ impl<'a> Router<'a> {
             "GET /api/business/:id" => self.handle_get_business(req, connections).await,
             "PUT /api/business/:id" => self.handle_update_business(req, connections).await,
             "POST /api/business" => self.handle_create_business(req, connections).await,
+            "POST /api/createRoute" => self.handle_calculate_route(req).await,
             _ => Ok(Response::not_found(None)),
         }
     }
@@ -58,6 +61,61 @@ impl<'a> Router<'a> {
             "data": data.unwrap()
         });
         Ok(Response::success(body, None))
+    }
+
+    async fn handle_calculate_route(&self, req: &Request) -> Result<Response> {
+        let data = req.body.as_ref();
+        if data.is_none() {
+            return Ok(Response::bad_request(Some(
+                "Data is not present in the request",
+            )));
+        }
+        let mut data = data.unwrap().clone();
+        let coords = data["coordinates"].take();
+
+        if !coords.is_array() {
+            return Ok(Response::bad_request(Some(
+                "Coordinates are missing in the request",
+            )));
+        }
+        let coords = coords.as_array().unwrap();
+        let mut is_valid = coords.len() == 4;
+
+        coords.iter().for_each(|item| {
+            if !item.is_f64() {
+                is_valid = false;
+            }
+        });
+        if !is_valid {
+            return Ok(Response::bad_request(Some(
+                "Invalid format for coordinates",
+            )));
+        }
+
+        let query = format!(
+            "[out:json];(
+        way[highway][highway!='street_lamp'][footway!='*']
+        ({},{},{},{});
+        node(w);
+
+    );
+    out skel;",
+            coords[0], coords[1], coords[2], coords[3]
+        );
+
+        let req_client = reqwest::Client::new();
+        let overpass_api = "https://overpass-api.de/api/interpreter";
+
+        let map_response = req_client
+            .post(overpass_api)
+            .header("Content-Type", "application/json")
+            .body(query)
+            .send()
+            .await?;
+
+        println!("{:?}", map_response.text().await?);
+
+        Ok(Response::success(json!({"message": "Good"}), None))
     }
 
     async fn handle_create_business(

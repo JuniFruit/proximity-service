@@ -2,7 +2,7 @@ import messageStore from '@/stores/message';
 import type { BusinessData } from '@/types/business';
 import type { LatLngExpression } from 'leaflet';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'http://192.168.178.22:3000';
 
 type Methods = 'GET' | 'PUT' | 'POST' | 'DELETE';
 

@@ -55,3 +55,11 @@ export const flyAndScale = (
 	};
 };
 
+export const isOpenNow = (opensAt: number, closesAt: number) => {
+	const date = new Date();
+	const hours = date.getHours();
+	const mins = date.getMinutes();
+	const hoursWithMins = mins / 60 + hours;
+	const isOpen = hoursWithMins >= opensAt && hoursWithMins <= closesAt;
+	return isOpen;
+};

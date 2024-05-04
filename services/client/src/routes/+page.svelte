@@ -8,6 +8,7 @@
 	import { Header } from '@/components/header';
 	import { BusinessCarousel } from '@/components/business-carousel';
 	import { searchBusinesses } from '@/shared/api';
+	import { isOpenNow } from '@/utils';
 	import type { BusinessData } from '@/types/business.d';
 	import {
 		createBusinessPopup,
@@ -44,6 +45,7 @@
 			prevSelectedBusiness = key;
 			if (businesses[key]) {
 				const { lat, lon } = businesses[key];
+				businessMarkers[key].openPopup();
 				map.setView([lat, lon]);
 			}
 		}
@@ -107,15 +109,14 @@
 	}
 
 	function createBusinessMarker(data: BusinessData): Marker {
-		const hours = new Date().getHours();
-		const isOpenNow = hours >= data.opensAt && hours <= data.closesAt;
+		const isOpen = isOpenNow(data.opensAt, data.closesAt);
 		return L.marker([data.lat, data.lon], {
 			icon: icons.location,
 			title: data.name,
-			opacity: isOpenNow ? 1 : 0.5,
+			opacity: isOpen ? 1 : 0.5,
 			riseOnHover: true
 		})
-			.bindPopup(createBusinessPopup(data, !isOpenNow))
+			.bindPopup(createBusinessPopup(data, !isOpen))
 			.addTo(map);
 	}
 
@@ -202,6 +203,9 @@
 
 	function onLocationSelected(pos: CustomEvent<[number, number]>) {
 		onPosChanged({ coords: { latitude: pos.detail[0], longitude: pos.detail[1] } }, true);
+		if ($uiStore.isSimMoving) {
+			onSimMovementCalled();
+		}
 	}
 
 	onMount(async () => {

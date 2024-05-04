@@ -80,16 +80,16 @@ declare module '$env/static/private' {
 	export const LC_CTYPE: string;
 	export const npm_config_user_agent: string;
 	export const KITTY_INSTALLATION_DIR: string;
-	export const KITTY_WINDOW_ID: string;
 	export const VIMRUNTIME: string;
+	export const KITTY_WINDOW_ID: string;
 	export const INFOPATH: string;
 	export const HOMEBREW_CELLAR: string;
 	export const VIM: string;
 	export const SECURITYSESSIONID: string;
 	export const npm_node_execpath: string;
 	export const npm_config_prefix: string;
-	export const COLORTERM: string;
 	export const KITTY_PUBLIC_KEY: string;
+	export const COLORTERM: string;
 	export const NODE_ENV: string;
 }
 
@@ -176,16 +176,16 @@ declare module '$env/dynamic/private' {
 		LC_CTYPE: string;
 		npm_config_user_agent: string;
 		KITTY_INSTALLATION_DIR: string;
-		KITTY_WINDOW_ID: string;
 		VIMRUNTIME: string;
+		KITTY_WINDOW_ID: string;
 		INFOPATH: string;
 		HOMEBREW_CELLAR: string;
 		VIM: string;
 		SECURITYSESSIONID: string;
 		npm_node_execpath: string;
 		npm_config_prefix: string;
-		COLORTERM: string;
 		KITTY_PUBLIC_KEY: string;
+		COLORTERM: string;
 		NODE_ENV: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
