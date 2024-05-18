@@ -1,8 +1,8 @@
 use crate::dbs::{BusinessData, DBConnections};
-use crate::path_finder::Node;
+use crate::path_finder::{create_path, ApiElements, Node, OverpassApiResponse};
 use crate::response::{Response, Result};
 use crate::Request;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -112,10 +112,18 @@ impl<'a> Router<'a> {
             .body(query)
             .send()
             .await?;
+        let res: OverpassApiResponse = map_response.json().await?;
+        if res.elements.is_empty() {
+            return Ok(Response::not_found(Some("Could not construct the path")));
+        }
 
-        println!("{:?}", map_response.text().await?);
+        create_path(
+            res.elements,
+            (coords[0].as_f64().unwrap(), coords[1].as_f64().unwrap()),
+            (coords[2].as_f64().unwrap(), coords[3].as_f64().unwrap()),
+        );
 
-        Ok(Response::success(json!({"message": "Good"}), None))
+        Ok(Response::not_found(Some("Not implemented")))
     }
 
     async fn handle_create_business(
