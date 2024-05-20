@@ -1,6 +1,8 @@
  # Build app
 FROM rust:1.76.0-buster as builder
+
 # create a new empty shell project
+
 RUN USER=root cargo new --bin api
 WORKDIR /api
 
@@ -20,10 +22,13 @@ RUN rm ./target/release/deps/api*
 RUN cargo build --release
 
 # our final base
-FROM debian:buster-slim
+FROM rust:1.76.0-buster
+RUN apt-get update && apt install -y openssl
+
 
 # copy the build artifact from the build stage
 COPY --from=builder /api/target/release/api .
+
 
 # set the startup command to run your binary
 CMD ["./api"]

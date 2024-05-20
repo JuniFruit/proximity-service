@@ -1,8 +1,8 @@
 use crate::dbs::{BusinessData, DBConnections};
-use crate::path_finder::{create_path, ApiElements, Node, OverpassApiResponse};
+use crate::path_finder::{create_path, OverpassApiResponse};
 use crate::response::{Response, Result};
 use crate::Request;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
@@ -117,13 +117,17 @@ impl<'a> Router<'a> {
             return Ok(Response::not_found(Some("Could not construct the path")));
         }
 
-        create_path(
+        let path = create_path(
             res.elements,
             (coords[0].as_f64().unwrap(), coords[1].as_f64().unwrap()),
             (coords[2].as_f64().unwrap(), coords[3].as_f64().unwrap()),
         );
 
-        Ok(Response::not_found(Some("Not implemented")))
+        if path.is_err() {
+            return Ok(Response::internal(Some(json!({"message": path.err()}))));
+        }
+
+        Ok(Response::success(json!({"path": path.unwrap()}), None))
     }
 
     async fn handle_create_business(
