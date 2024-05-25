@@ -2,18 +2,20 @@
 	import uiStore from '@/stores/ui';
 	import configStore from '@/stores/config';
 	import { browser } from '$app/environment';
-	import type { LatLngExpression, Map, Icon, Marker } from 'leaflet';
+	import type { LatLngExpression, Map, Icon, Marker, Polyline, Circle } from 'leaflet';
 	import { onDestroy, onMount } from 'svelte';
 	import { Footer } from '@/components/footer';
 	import { Header } from '@/components/header';
 	import { BusinessCarousel } from '@/components/business-carousel';
-	import { searchBusinesses } from '@/shared/api';
+	import { getPath, searchBusinesses } from '@/shared/api';
 	import { isOpenNow } from '@/utils';
 	import type { BusinessData } from '@/types/business.d';
 	import {
 		createBusinessPopup,
+		createGeoJSONCircle,
 		createMap,
 		findDistanceBetweenPoints,
+		getBoundingBoxFromPolygon,
 		getUserGeo,
 		initialMapOpts,
 		setupIcons
@@ -21,6 +23,12 @@
 	import messageStore from '@/stores/message';
 	import windowStore from '@/stores/window';
 	import { Button } from '@/components/ui/button';
+	import type { WayNode } from '@/types/api';
+
+	type CurrentPath = {
+		path: number[][];
+		polyline: Polyline | null;
+	};
 
 	let L: any;
 	let map: Map;
@@ -35,8 +43,13 @@
 	let businessMarkers: Record<string, Marker> = {};
 	let isTrackingView = false;
 	let prevSelectedBusiness: number = 0;
+	let currentCircle: Circle;
 	let targetMarker: Marker;
 	let lastView: LatLngExpression = initialMapOpts.center!;
+	let currentPath: CurrentPath = {
+		path: [],
+		polyline: null
+	};
 
 	$: {
 		if ($uiStore.businessSelected && $uiStore.businessSelected !== prevSelectedBusiness) {
@@ -61,6 +74,39 @@
 		});
 	}
 
+	async function goToPoint(target: LatLngExpression) {
+		await requestPath(target);
+		simulateMovement();
+	}
+
+	async function requestPath(target: LatLngExpression) {
+		if (Array.isArray(target) && Array.isArray(currentView)) {
+			const circle = createGeoJSONCircle(
+				currentView as number[],
+				$configStore.requestRadius / 1000
+			);
+			const area = getBoundingBoxFromPolygon(circle);
+
+			const path = await getPath({
+				area,
+				origin: currentView as number[],
+				target: target as number[]
+			});
+			if (path) {
+				drawPath(path);
+			}
+		}
+	}
+
+	function drawPath(path: WayNode[]) {
+		const coords = path.map((item) => {
+			return [item.lat, item.lon];
+		});
+		const poly = L.polyline(coords).addTo(map);
+		currentPath.path = coords;
+		currentPath.polyline = poly;
+	}
+
 	function onSimMovementCalled() {
 		if (movingInterval && $uiStore.isSimMoving) {
 			clearInterval(movingInterval);
@@ -74,12 +120,40 @@
 
 		uiStore.update((data) => {
 			data.isChoosingPoint = true;
-			data.onPosConfirmed = simulateMovement;
+			if ($configStore.simMovementMode === 'fly') {
+				data.onPosConfirmed = simulateFlying;
+			} else {
+				data.onPosConfirmed = goToPoint;
+			}
 			return data;
 		});
 	}
 
-	function simulateMovement(target: [number, number]) {
+	function simulateMovement() {
+		uiStore.update((data) => {
+			data.isSimMoving = true;
+			return data;
+		});
+		movingInterval = setInterval(() => {
+			const nodePos = currentPath.path.shift();
+			if (!nodePos) {
+				onSimMovementCalled();
+				currentPath.polyline?.remove();
+				return;
+			}
+			onPosChanged({
+				coords: {
+					latitude: nodePos[0],
+					longitude: nodePos[1]
+				}
+			});
+			if (currentPath.polyline) {
+				currentPath.polyline.setLatLngs(currentPath.path as any);
+			}
+		}, 1000);
+	}
+
+	function simulateFlying(target: [number, number]) {
 		uiStore.update((data) => {
 			data.isSimMoving = true;
 			return data;
@@ -163,6 +237,11 @@
 		updateNavMarker();
 		if (isTrackingView || isSetView) {
 			map.setView(currentView);
+		}
+		if (!currentCircle) {
+			currentCircle = L.circle(currentView, { radius: $configStore.requestRadius }).addTo(map);
+		} else {
+			currentCircle.setLatLng(currentView);
 		}
 	}
 

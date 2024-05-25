@@ -1,16 +1,20 @@
 <script lang="ts">
 	import * as Dialog from '@/components/ui/dialog';
+	import * as Command from '@/components/ui/command';
+	import * as Popover from '@/components/ui/popover';
 	import { Small } from '../ui/typography';
 	import { Button } from '../ui/button';
 	import uiStore from '@/stores/ui';
 	import configStore from '@/stores/config';
 	import messageStore from '@/stores/message';
-	import { Gear } from 'svelte-radix';
+	import { ChevronDown, Gear } from 'svelte-radix';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { Input } from '../ui/input';
 
 	let isDialogOpen = false;
+	let simModeSelector = false;
+	let simModes = ['fly', 'drive'];
 
 	function saveConfig() {
 		try {
@@ -25,6 +29,12 @@
 	function apply() {
 		saveConfig();
 		window.location.reload();
+	}
+	function onModeSelected(value: string) {
+		configStore.update((data) => {
+			data.simMovementMode = value as 'drive' | 'fly';
+			return data;
+		});
 	}
 
 	onMount(() => {
@@ -83,9 +93,34 @@
 				></Input>
 			</div>
 			<div class="flex items-center justify-between">
-				<Small>Movement speed (m/s)</Small>
-				<Input type="number" min={1} max={50} class="max-w-fit" value={$configStore.movementSpeed}
-				></Input>
+				<Small>Movement mode</Small>
+				<Popover.Root bind:open={simModeSelector}>
+					<Popover.Trigger asChild let:builder>
+						<Button
+							builders={[builder]}
+							variant="outline"
+							role="combobox"
+							aria-expanded={simModeSelector}
+							class="w-[200px] justify-between md:w-[300px]"
+						>
+							{$configStore.simMovementMode || 'fly'}
+							<ChevronDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+						</Button>
+					</Popover.Trigger>
+					<Popover.Content class="w-[200px] p-0 md:w-[300px]">
+						<Command.Root>
+							<Command.Input placeholder="Choose mode" />
+							<Command.Empty>No mode found.</Command.Empty>
+							<Command.Group>
+								{#each simModes as mode}
+									<Command.Item value={mode} onSelect={onModeSelected}>
+										{mode}
+									</Command.Item>
+								{/each}
+							</Command.Group>
+						</Command.Root>
+					</Popover.Content>
+				</Popover.Root>
 			</div>
 		</div>
 		<Dialog.Footer>

@@ -1,4 +1,5 @@
 import messageStore from '@/stores/message';
+import type { PathData, WayNode } from '@/types/api';
 import type { BusinessData } from '@/types/business';
 import type { LatLngExpression } from 'leaflet';
 
@@ -62,6 +63,11 @@ export const updateBusiness = async (id: number, data: Partial<BusinessData>) =>
 		data
 	);
 	return res?.message;
+};
+
+export const getPath = async (data: PathData) => {
+	const res = await request<PathData, { path: WayNode[] }>(`/api/createPath`, 'POST', data);
+	return res?.path;
 };
 
 export const createBusiness = async (data: Omit<BusinessData, 'id'>) => {

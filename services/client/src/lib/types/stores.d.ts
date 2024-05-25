@@ -6,8 +6,8 @@ export type UIStore = {
 };
 
 export type ConfigStore = {
-	movementSpeed: number;
 	requestDebounceRadius: number;
 	requestRadius: number;
 	maxVisibleRadius: number;
+	simMovementMode: 'fly' | 'drive';
 };

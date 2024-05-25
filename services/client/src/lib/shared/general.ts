@@ -99,3 +99,58 @@ export function findDistanceBetweenPoints(pos1: LatLngExpression, pos2: LatLngEx
 	const angle = Math.acos(cosAngle);
 	return angle * KEquatorialRadiusInMetres;
 }
+
+/**
+ *
+ * @param center array with lat and lon coordinates of the center point
+ * @param radiusInKm radius
+ * @param points how many will the resulting polygon have
+ * @returns 2D array with latitude and longitude coordinates for each point
+ */
+export function createGeoJSONCircle(center: number[], radiusInKm: number, points = 64) {
+	const coords = {
+		latitude: center[0],
+		longitude: center[1]
+	};
+
+	const km = radiusInKm;
+
+	const ret = [];
+	const distanceX = km / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
+	const distanceY = km / 110.574;
+
+	let theta, x, y;
+	for (let i = 0; i < points; i++) {
+		theta = (i / points) * (2 * Math.PI);
+		x = distanceX * Math.cos(theta);
+		y = distanceY * Math.sin(theta);
+
+		ret.push([coords.longitude + x, coords.latitude + y]);
+	}
+	ret.push(ret[0]);
+
+	return ret;
+}
+
+export function getBoundingBoxFromPolygon(polygon: number[][]): number[] {
+	const boundingBox = {
+		minLat: Number.MAX_VALUE,
+		maxLat: -Number.MAX_VALUE,
+		minLon: Number.MAX_VALUE,
+		maxLon: -Number.MAX_VALUE
+	};
+	for (const coordinate of polygon) {
+		if (coordinate[0] < boundingBox.minLon) boundingBox.minLon = coordinate[0];
+		if (coordinate[0] > boundingBox.maxLon) boundingBox.maxLon = coordinate[0];
+		if (coordinate[1] < boundingBox.minLat) boundingBox.minLat = coordinate[1];
+		if (coordinate[1] > boundingBox.maxLat) boundingBox.maxLat = coordinate[1];
+	}
+
+	const formatted = [
+		boundingBox.minLat,
+		boundingBox.minLon,
+		boundingBox.maxLat,
+		boundingBox.maxLon
+	];
+	return formatted;
+}

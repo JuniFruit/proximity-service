@@ -4,8 +4,8 @@ import { writable } from 'svelte/store';
 const initial: ConfigStore = {
 	requestDebounceRadius: 100,
 	requestRadius: 2000,
-	movementSpeed: 30,
-	maxVisibleRadius: 5000
+	maxVisibleRadius: 5000,
+	simMovementMode: 'fly'
 };
 
 const configStore = writable(initial);

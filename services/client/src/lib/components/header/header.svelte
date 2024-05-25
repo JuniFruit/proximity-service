@@ -85,7 +85,7 @@
 			<Popover.Content class="w-[200px] p-0 md:w-[300px]">
 				<Command.Root>
 					<Command.Input placeholder="Search location..." />
-					<Command.Empty>No framework found.</Command.Empty>
+					<Command.Empty>No location found.</Command.Empty>
 					<Command.Group>
 						{#each locations as location}
 							<Command.Item
