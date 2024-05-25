@@ -1,11 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    error::Error,
-    f64::consts::PI,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, error::Error, f64::consts::PI, rc::Rc};
 
 pub type LatLonPos = (f64, f64);
 
@@ -50,20 +44,20 @@ pub struct Node {
 pub struct GraphNode {
     pub data: Node,
     pub visited: bool,
-    pub distance_from_start: f64,
+    pub distance_from_start: u32,
     pub parent_id: Option<u64>,
     pub edges: Vec<u64>,
-    pub f_score: f64,
+    pub f_score: u32,
 }
 
 impl GraphNode {
     pub fn init(node: Node) -> Rc<RefCell<GraphNode>> {
         Rc::new(RefCell::new(GraphNode {
-            f_score: 0.0,
+            f_score: 0,
             data: node,
             visited: false,
             parent_id: None,
-            distance_from_start: f64::INFINITY,
+            distance_from_start: u32::MAX,
             edges: vec![],
         }))
     }
@@ -114,34 +108,36 @@ impl Graph {
             .add_edge_to(start_node_id.to_owned())
     }
 
-    pub fn find_closest_start(&mut self, start: LatLonPos) {
+    fn find_closest_node_id(&self, pos: LatLonPos) -> u64 {
+        let (lat, lon) = pos;
+        let mut closest: (u32, u64) = (u32::MAX, 0);
+
         for (id, node) in self.nodes.iter() {
-            if is_within_radius(
-                start,
+            let delta = find_distance_between_points(
+                (lat, lon),
                 (node.borrow().data.lat, node.borrow().data.lon),
-                1000,
-            ) {
-                self.start_node = Some(id.to_owned());
-                return;
+            );
+            let prev_delta = closest.0;
+            if delta < prev_delta {
+                closest = (delta, id.to_owned())
             }
         }
+        closest.1
+    }
+
+    pub fn find_closest_start(&mut self, start: LatLonPos) {
+        let id = self.find_closest_node_id(start);
+        let start_node = self.get_node(&id);
+        start_node.unwrap().borrow_mut().distance_from_start = 0;
+        self.start_node = Some(id);
     }
 
     pub fn find_closest_target(&mut self, target: LatLonPos) {
-        for (id, node) in self.nodes.iter() {
-            if is_within_radius(
-                target,
-                (node.borrow().data.lat, node.borrow().data.lon),
-                1000,
-            ) {
-                self.target_node = Some(id.to_owned());
-                return;
-            }
-        }
+        self.target_node = Some(self.find_closest_node_id(target));
     }
 }
 
-fn is_within_radius(pos1: LatLonPos, pos2: LatLonPos, radius: u16) -> bool {
+fn find_distance_between_points(pos1: LatLonPos, pos2: LatLonPos) -> u32 {
     let k_equatorial_radius_in_metres: u32 = 6378137;
     let kpi_double = PI;
     let k_degrees_to_radians_double = kpi_double / 180.0;
@@ -158,14 +154,12 @@ fn is_within_radius(pos1: LatLonPos, pos2: LatLonPos, radius: u16) -> bool {
     acos to give a domain error and return the special floating point value
     -1.#IND000000000000, meaning 'indefinite'. Observed on VS2008 on 64-bit Windows.
     */
-    if cos_angle >= 0.0 {
-        return true;
+    if cos_angle >= 1.0 {
+        return 0;
     }
 
     let angle = cos_angle.acos();
-    let distance = angle * k_equatorial_radius_in_metres as f64;
-
-    radius as f64 <= distance
+    (angle * k_equatorial_radius_in_metres as f64).round() as u32
 }
 
 fn connect_nodes(way: &ApiWay, graph: &mut Graph) {
@@ -179,32 +173,43 @@ fn connect_nodes(way: &ApiWay, graph: &mut Graph) {
 }
 
 // A* path finding algorithm
-fn find_path(graph: &Graph) -> Result<Option<u64>, Box<dyn Error>> {
+fn find_path(graph: &Graph, target: LatLonPos) -> Result<Option<u64>, Box<dyn Error>> {
     let id = graph.start_node.unwrap();
     let start_node = graph.get_node(&id).unwrap();
     let mut open_set = vec![start_node.clone()];
     let mut closed_set: Vec<Rc<RefCell<GraphNode>>> = vec![];
+    let end_node = graph.get_node(&graph.target_node.unwrap()).unwrap();
 
     while !open_set.is_empty() {
         let lowest_ind = find_lowest_f_score_node_ind(&open_set);
         let removed_node = open_set.remove(lowest_ind);
         let current_node = removed_node.try_borrow()?;
+        let current_node_pos: LatLonPos = (current_node.data.lat, current_node.data.lon);
 
         if current_node.data.id == graph.target_node.unwrap() {
             return Ok(Some(current_node.data.id));
         }
+
         closed_set.push(removed_node.clone());
 
         for neighbor_id in current_node.edges.iter() {
             let neighbor_node = graph.get_node(neighbor_id).unwrap().clone();
-            let neighbor = neighbor_node.try_borrow()?;
-            let mut neigbor_mut = neighbor_node.try_borrow_mut()?;
+
+            let is_neighbor_end = neighbor_id == &graph.target_node.unwrap();
+            // if it's mutalbly borrowed, it can be only the end node
+            let mut neigbor_mut = if is_neighbor_end {
+                end_node.try_borrow_mut()?
+            } else {
+                neighbor_node.try_borrow_mut()?
+            };
+
+            let neighbor_pos: LatLonPos = (neigbor_mut.data.lat, neigbor_mut.data.lon);
 
             if !set_includes(&closed_set, neighbor_id) {
-                let current_distance =
-                    current_node.distance_from_start + count_hypot(&current_node, &neighbor);
+                let current_distance = current_node.distance_from_start
+                    + find_distance_between_points(current_node_pos, neighbor_pos);
                 if set_includes(&open_set, neighbor_id)
-                    && neighbor.distance_from_start > current_distance
+                    && neigbor_mut.distance_from_start > current_distance
                 {
                     neigbor_mut.distance_from_start = current_distance;
                 } else {
@@ -212,12 +217,8 @@ fn find_path(graph: &Graph) -> Result<Option<u64>, Box<dyn Error>> {
                     neigbor_mut.parent_id = Some(current_node.data.id);
                     open_set.push(neighbor_node.clone());
                 }
-                let end_node = graph
-                    .get_node(&graph.target_node.unwrap())
-                    .unwrap()
-                    .borrow();
-                let heuristics = count_heuristics(&current_node, &end_node);
-                let f_score = neighbor.distance_from_start + heuristics;
+                let heuristics = count_heuristics(current_node_pos, target);
+                let f_score = neigbor_mut.distance_from_start + heuristics;
                 neigbor_mut.f_score = f_score;
             }
         }
@@ -225,16 +226,18 @@ fn find_path(graph: &Graph) -> Result<Option<u64>, Box<dyn Error>> {
     Ok(None)
 }
 
-fn count_heuristics(node: &Ref<GraphNode>, end_node: &Ref<GraphNode>) -> f64 {
-    (node.data.lat - end_node.data.lat).abs() + (node.data.lon - end_node.data.lon).abs()
-}
-
-fn count_hypot(node1: &Ref<GraphNode>, node2: &Ref<GraphNode>) -> f64 {
-    ((node2.data.lat - node1.data.lat).powi(2) + (node2.data.lon - node1.data.lon).powi(2)).sqrt()
+fn count_heuristics(node_pos: LatLonPos, end_node_pos: LatLonPos) -> u32 {
+    ((node_pos.0 - end_node_pos.0).abs() + (node_pos.1 - end_node_pos.1).abs()).round() as u32
 }
 
 fn set_includes(set: &[Rc<RefCell<GraphNode>>], node_id: &u64) -> bool {
-    let res = set.iter().find(|item| &item.borrow().data.id == node_id);
+    let res = set.iter().find(|item| {
+        let borrowed = item.try_borrow();
+        if borrowed.is_err() {
+            return true;
+        }
+        &borrowed.unwrap().data.id == node_id
+    });
     res.is_some()
 }
 
@@ -323,7 +326,7 @@ pub fn create_path(
     if graph.target_node.is_none() {
         graph.find_closest_target(target_pos);
     }
-    let result = find_path(&graph);
+    let result = find_path(&graph, target_pos);
 
     match result {
         Ok(val) => {
@@ -334,8 +337,11 @@ pub fn create_path(
                 Err(String::from("Couldn't find a path to a requested point"))
             }
         }
-        _ => Err(String::from(
-            "Something went wrong when calculating the path",
-        )),
+        e => {
+            println!("{:?}", e);
+            Err(String::from(
+                "Something went wrong when calculating the path",
+            ))
+        }
     }
 }

@@ -71,14 +71,22 @@ impl<'a> Router<'a> {
             )));
         }
         let mut data = data.unwrap().clone();
-        let coords = data["coordinates"].take();
+        let area = data["area"].take();
+        let target = data["target"].take();
+        let origin = data["origin"].take();
 
-        if !coords.is_array() {
+        if !target.is_array() || !origin.is_array() {
             return Ok(Response::bad_request(Some(
-                "Coordinates are missing in the request",
+                "Target or origin were not correctly specified",
             )));
         }
-        let coords = coords.as_array().unwrap();
+
+        if !area.is_array() {
+            return Ok(Response::bad_request(Some(
+                "Bounding box area coordinates are missing in the request",
+            )));
+        }
+        let coords = area.as_array().unwrap();
         let mut is_valid = coords.len() == 4;
 
         coords.iter().for_each(|item| {
@@ -94,7 +102,7 @@ impl<'a> Router<'a> {
 
         let query = format!(
             "[out:json];(
-        way[highway][highway!='street_lamp'][footway!='*']
+        way[highway][highway!='footway'][highway!='street_lamp'][highway!='steps'][highway!='pedestrian'][highway!='track'][highway!='path'][footway!='*']
         ({},{},{},{});
         node(w);
 
@@ -112,6 +120,13 @@ impl<'a> Router<'a> {
             .body(query)
             .send()
             .await?;
+        let res_status = map_response.status();
+        if !res_status.is_success() {
+            return Ok(Response::bad_request(Some(&format!(
+                "{}: Failed to get map data from server",
+                res_status.as_str()
+            ))));
+        }
         let res: OverpassApiResponse = map_response.json().await?;
         if res.elements.is_empty() {
             return Ok(Response::not_found(Some("Could not construct the path")));
@@ -119,8 +134,14 @@ impl<'a> Router<'a> {
 
         let path = create_path(
             res.elements,
-            (coords[0].as_f64().unwrap(), coords[1].as_f64().unwrap()),
-            (coords[2].as_f64().unwrap(), coords[3].as_f64().unwrap()),
+            (
+                origin.as_array().unwrap()[0].as_f64().unwrap(),
+                origin.as_array().unwrap()[1].as_f64().unwrap(),
+            ),
+            (
+                target.as_array().unwrap()[0].as_f64().unwrap(),
+                target.as_array().unwrap()[1].as_f64().unwrap(),
+            ),
         );
 
         if path.is_err() {
