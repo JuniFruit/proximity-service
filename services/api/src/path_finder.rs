@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, error::Error, f64::consts::PI, rc::Rc};
+use std::{
+    cell::RefCell, collections::HashMap, error::Error, f64::consts::PI, rc::Rc, time::Instant,
+};
 
 pub type LatLonPos = (f64, f64);
 
@@ -278,6 +280,8 @@ pub fn create_path(
     start_pos: LatLonPos,
     target_pos: LatLonPos,
 ) -> Result<Vec<Node>, String> {
+    let start_time = Instant::now();
+
     let mut graph = Graph::init();
     for el in elements.iter() {
         match el {
@@ -332,6 +336,7 @@ pub fn create_path(
         Ok(val) => {
             if let Some(res) = val {
                 let path = construct_path(res, graph);
+                println!("Path finder took {:?}", start_time.elapsed());
                 Ok(path)
             } else {
                 Err(String::from("Couldn't find a path to a requested point"))
