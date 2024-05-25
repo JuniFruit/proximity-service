@@ -1,9 +1,10 @@
 import messageStore from '@/stores/message';
+import uiStore from '@/stores/ui';
 import type { PathData, WayNode } from '@/types/api';
 import type { BusinessData } from '@/types/business';
 import type { LatLngExpression } from 'leaflet';
 
-const BASE_URL = 'http://192.168.178.22:3000';
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 type Methods = 'GET' | 'PUT' | 'POST' | 'DELETE';
 
@@ -14,6 +15,10 @@ const request = async <T = object, R = object>(
 	headers = {}
 ): Promise<R | null> => {
 	try {
+		uiStore.update((data) => {
+			data.isLoading = true;
+			return data;
+		});
 		const res = await fetch(`${BASE_URL}${path}`, {
 			method,
 			body: JSON.stringify(data),
@@ -39,6 +44,11 @@ const request = async <T = object, R = object>(
 	} catch (error: unknown) {
 		messageStore.update(() => (error as Error).message);
 		return null;
+	} finally {
+		uiStore.update((data) => {
+			data.isLoading = false;
+			return data;
+		});
 	}
 };
 

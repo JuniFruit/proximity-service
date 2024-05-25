@@ -3,6 +3,7 @@ export type UIStore = {
 	isSimMoving: boolean;
 	isChoosingPoint: boolean;
 	onPosConfirmed?: (pos: [number, number]) => void;
+	isLoading: boolean;
 };
 
 export type ConfigStore = {

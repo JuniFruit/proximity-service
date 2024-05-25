@@ -4,7 +4,8 @@ import { writable } from 'svelte/store';
 const initial: UIStore = {
 	businessSelected: 0,
 	isSimMoving: false,
-	isChoosingPoint: false
+	isChoosingPoint: false,
+	isLoading: false
 };
 
 const uiStore = writable(initial);
