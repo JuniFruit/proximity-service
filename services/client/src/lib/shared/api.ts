@@ -4,7 +4,7 @@ import type { PathData, WayNode } from '@/types/api';
 import type { BusinessData } from '@/types/business';
 import type { LatLngExpression } from 'leaflet';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 type Methods = 'GET' | 'PUT' | 'POST' | 'DELETE';
 

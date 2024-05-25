@@ -111,6 +111,8 @@
 		if (movingInterval && $uiStore.isSimMoving) {
 			clearInterval(movingInterval);
 			targetMarker && targetMarker.remove();
+			currentPath.polyline?.remove();
+			currentPath.polyline = null;
 			uiStore.update((data) => {
 				data.isSimMoving = false;
 				return data;
@@ -138,7 +140,6 @@
 			const nodePos = currentPath.path.shift();
 			if (!nodePos) {
 				onSimMovementCalled();
-				currentPath.polyline?.remove();
 				return;
 			}
 			onPosChanged({

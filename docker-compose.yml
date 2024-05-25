@@ -2,7 +2,10 @@ version: "3.9"
 services:
   proxy:
     image: proximity/proxy
-    build: ./services/proxy/
+    build:
+      context: "."
+      dockerfile: ./services/proxy/Dockerfile
+
     restart: always
     networks:
       - proximity
@@ -85,6 +88,25 @@ services:
       options:
         max-size: "2m"
         max-file: "3"
+  # client:
+  #   networks:
+  #     - proximity
+  #   ports:
+  #     - "3001:3001"
+  #   image: proximity/client
+  #   build: ./services/client/
+  #   # build:
+  #   #   dockerfile: ./services/client/Dockerfile
+  #   #   context: ./
+  #   #   args:
+  #   #     API_URL: http://proximity_service-proxy-1:3000
+  #   restart: always
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "2m"
+  #       max-file: "3"
+
 networks:
   proximity:
     driver: bridge

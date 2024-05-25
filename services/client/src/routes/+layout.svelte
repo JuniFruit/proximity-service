@@ -6,6 +6,7 @@
 	import { onDestroy } from 'svelte';
 
 	let message: string;
+	export const ssr = false;
 
 	const unsub = messageStore.subscribe((msg: string) => {
 		message = msg;
