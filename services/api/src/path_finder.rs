@@ -323,11 +323,13 @@ pub fn create_path(
     if graph.target_node.is_none() {
         graph.find_closest_target(target_pos);
     }
-    println!("A* started");
+
+    if graph.start_node.is_none() || graph.target_node.is_none() {
+        return Err(String::from("Requested locations are outside search area"));
+    }
 
     let result = find_path(&graph, target_pos);
 
-    println!("A* finished");
     match result {
         Ok(val) => {
             if let Some(res) = val {
