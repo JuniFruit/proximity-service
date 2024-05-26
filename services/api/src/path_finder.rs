@@ -129,8 +129,6 @@ impl Graph {
 
     pub fn find_closest_start(&mut self, start: LatLonPos) {
         let id = self.find_closest_node_id(start);
-        let start_node = self.get_node(&id);
-        start_node.unwrap().borrow_mut().distance_from_start = 0;
         self.start_node = Some(id);
     }
 
@@ -175,7 +173,10 @@ fn connect_nodes(way: &ApiWay, graph: &mut Graph) {
 }
 
 // A* path finding algorithm
-fn find_path(graph: &Graph, target: LatLonPos) -> Result<Option<u64>, Box<dyn Error>> {
+fn find_path(
+    graph: &Graph,
+    target: LatLonPos,
+) -> Result<Option<u64>, Box<dyn Error + Sync + Send>> {
     let id = graph.start_node.unwrap();
     let start_node = graph.get_node(&id).unwrap();
     let mut open_set = vec![start_node.clone()];
@@ -290,20 +291,17 @@ pub fn create_path(
                     lon: lon.to_owned(),
                     r#type: r#type.to_owned(),
                 };
-                let graph_node = GraphNode::init(node);
+                let graph_node_pointer = GraphNode::init(node);
+                let graph_node = graph_node_pointer.borrow();
 
-                if start_pos.0 == graph_node.borrow().data.lat
-                    && start_pos.1 == graph_node.borrow().data.lon
-                {
-                    graph.start_node = Some(graph_node.borrow().data.id)
+                if start_pos.0 == graph_node.data.lat && start_pos.1 == graph_node.data.lon {
+                    graph.start_node = Some(graph_node.data.id)
                 }
-                if target_pos.0 == graph_node.borrow().data.lat
-                    && target_pos.1 == graph_node.borrow().data.lon
-                {
-                    graph.target_node = Some(graph_node.borrow().data.id)
+                if target_pos.0 == graph_node.data.lat && target_pos.1 == graph_node.data.lon {
+                    graph.target_node = Some(graph_node.data.id)
                 }
 
-                graph.add_node(graph_node);
+                graph.add_node(graph_node_pointer.clone());
             }
             ApiElements::ApiWay { id, nodes, r#type } => connect_nodes(
                 &ApiWay {
@@ -326,6 +324,13 @@ pub fn create_path(
 
     if graph.start_node.is_none() || graph.target_node.is_none() {
         return Err(String::from("Requested locations are outside search area"));
+    }
+    {
+        graph
+            .get_node(&graph.start_node.unwrap())
+            .unwrap()
+            .borrow_mut()
+            .distance_from_start = 0;
     }
 
     let result = find_path(&graph, target_pos);
