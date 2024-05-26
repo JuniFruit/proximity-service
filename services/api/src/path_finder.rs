@@ -179,20 +179,21 @@ fn find_path(graph: &Graph, target: LatLonPos) -> Result<Option<u64>, Box<dyn Er
     let id = graph.start_node.unwrap();
     let start_node = graph.get_node(&id).unwrap();
     let mut open_set = vec![start_node.clone()];
-    let mut closed_set: Vec<Rc<RefCell<GraphNode>>> = vec![];
     let end_node = graph.get_node(&graph.target_node.unwrap()).unwrap();
 
     while !open_set.is_empty() {
-        let lowest_ind = find_lowest_f_score_node_ind(&open_set);
-        let removed_node = open_set.remove(lowest_ind);
-        let current_node = removed_node.try_borrow()?;
+        let removed_node = open_set.pop();
+        if removed_node.is_none() {
+            continue;
+        }
+        let current_node = removed_node.unwrap();
+        let current_node = current_node.try_borrow()?;
+
         let current_node_pos: LatLonPos = (current_node.data.lat, current_node.data.lon);
 
         if current_node.data.id == graph.target_node.unwrap() {
             return Ok(Some(current_node.data.id));
         }
-
-        closed_set.push(removed_node.clone());
 
         for neighbor_id in current_node.edges.iter() {
             let neighbor_node = graph.get_node(neighbor_id).unwrap().clone();
@@ -205,31 +206,28 @@ fn find_path(graph: &Graph, target: LatLonPos) -> Result<Option<u64>, Box<dyn Er
                 neighbor_node.try_borrow_mut()?
             };
 
-            let neighbor_pos: LatLonPos = (neigbor_mut.data.lat, neigbor_mut.data.lon);
+            if is_neighbor_end {
+                neigbor_mut.parent_id = Some(current_node.data.id);
+                return Ok(Some(neigbor_mut.data.id));
+            }
 
-            if !set_includes(&closed_set, neighbor_id) {
-                let current_distance = current_node.distance_from_start
-                    + find_distance_between_points(current_node_pos, neighbor_pos);
-                if set_includes(&open_set, neighbor_id)
-                    && neigbor_mut.distance_from_start > current_distance
-                {
-                    neigbor_mut.distance_from_start = current_distance;
-                } else {
-                    neigbor_mut.distance_from_start = current_distance;
-                    neigbor_mut.parent_id = Some(current_node.data.id);
-                    open_set.push(neighbor_node.clone());
-                }
+            let neighbor_pos: LatLonPos = (neigbor_mut.data.lat, neigbor_mut.data.lon);
+            let current_distance = current_node.distance_from_start
+                + find_distance_between_points(current_node_pos, neighbor_pos);
+            if current_distance < neigbor_mut.distance_from_start {
+                neigbor_mut.distance_from_start = current_distance;
+                neigbor_mut.parent_id = Some(current_node.data.id);
                 let heuristics = count_heuristics(current_node_pos, target);
                 let f_score = neigbor_mut.distance_from_start + heuristics;
                 neigbor_mut.f_score = f_score;
+                if !set_includes(&open_set, neighbor_id) {
+                    open_set.push(neighbor_node.clone())
+                }
             }
         }
+        open_set.sort_by(|a, b| b.borrow().f_score.partial_cmp(&a.borrow().f_score).unwrap());
     }
     Ok(None)
-}
-
-fn count_heuristics(node_pos: LatLonPos, end_node_pos: LatLonPos) -> u32 {
-    ((node_pos.0 - end_node_pos.0).abs() + (node_pos.1 - end_node_pos.1).abs()).round() as u32
 }
 
 fn set_includes(set: &[Rc<RefCell<GraphNode>>], node_id: &u64) -> bool {
@@ -243,14 +241,8 @@ fn set_includes(set: &[Rc<RefCell<GraphNode>>], node_id: &u64) -> bool {
     res.is_some()
 }
 
-fn find_lowest_f_score_node_ind(set: &[Rc<RefCell<GraphNode>>]) -> usize {
-    let mut lowest_ind: usize = 0;
-    for (ind, node) in set.iter().enumerate() {
-        if node.borrow().f_score < set[lowest_ind].borrow().f_score {
-            lowest_ind = ind;
-        }
-    }
-    lowest_ind
+fn count_heuristics(node_pos: LatLonPos, end_node_pos: LatLonPos) -> u32 {
+    ((node_pos.0 - end_node_pos.0).abs() + (node_pos.1 - end_node_pos.1).abs()).round() as u32
 }
 
 fn construct_path(end_node_id: u64, graph: Graph) -> Vec<Node> {
@@ -282,6 +274,7 @@ pub fn create_path(
 ) -> Result<Vec<Node>, String> {
     let start_time = Instant::now();
 
+    println!("Graph started");
     let mut graph = Graph::init();
     for el in elements.iter() {
         match el {
@@ -330,8 +323,11 @@ pub fn create_path(
     if graph.target_node.is_none() {
         graph.find_closest_target(target_pos);
     }
+    println!("A* started");
+
     let result = find_path(&graph, target_pos);
 
+    println!("A* finished");
     match result {
         Ok(val) => {
             if let Some(res) = val {
