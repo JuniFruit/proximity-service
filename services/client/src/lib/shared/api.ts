@@ -76,7 +76,7 @@ export const updateBusiness = async (id: number, data: Partial<BusinessData>) =>
 };
 
 export const getPath = async (data: PathData) => {
-	const res = await request<PathData, { path: WayNode[] }>(`/api/createPath`, 'POST', data);
+	const res = await request<PathData, { path: WayNode[] }>(`/api/createRoute`, 'POST', data);
 	return res?.path;
 };
 

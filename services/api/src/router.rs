@@ -234,15 +234,26 @@ impl<'a> Router<'a> {
                 continue;
             }
 
-            // start constructing params if existing path is the same length as path from client and if
-            // their first values match
-            if splitted_requested.len() == splitted_existing.len()
-                && splitted_requested[0].trim() == splitted_existing[0].trim()
-            {
+            if compare_paths(&splitted_requested, &splitted_existing) {
                 matched_path = Some(path);
                 self.construct_params(&mut splitted_existing, &mut splitted_requested, params_map);
+                break;
             }
         }
         matched_path
     }
+}
+fn compare_paths(requested: &VecDeque<&str>, existing: &VecDeque<&str>) -> bool {
+    for (ind, item) in requested.iter().enumerate() {
+        let current_requested = *item;
+        let current_existing = existing[ind];
+        if current_requested != current_existing {
+            let is_param = current_existing.contains(':');
+            if !is_param {
+                return false;
+            }
+        }
+    }
+
+    true
 }
