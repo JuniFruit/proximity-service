@@ -63,15 +63,25 @@ export function createMap(container: HTMLElement, L: any) {
 	return m;
 }
 
-export function createBusinessPopup(businessInfo: BusinessData, isClosed = false) {
-	return `
+export function createBusinessPopup(
+	businessInfo: BusinessData,
+	isClosed = false,
+	onClick?: (ev: MouseEvent) => void
+) {
+	const el = document.createElement('div');
+	el.innerHTML = `
 <div class="flex flex-col gap-2">
   <h3 class="font-semibold text-sm">${businessInfo.name}</h3>
   <h5 class="">Rating: ${businessInfo.stars}/5</h5>
   <span class="font-medium py-0">${businessInfo.type}</span>
   <span class="font-normal">${isClosed ? 'Opens at ' + businessInfo.opensAt + ':00' : 'Closes at ' + businessInfo.closesAt + ':00'}</span>
+  <button id="${businessInfo.id}" class="bg-green-400 text-white h-8 rounded-sm">Directions</button>
 </div>
 `;
+	if (onClick) {
+		el.onclick = onClick;
+	}
+	return el;
 }
 /**
  * Find distance between 2 geo points in meters

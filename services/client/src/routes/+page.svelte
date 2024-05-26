@@ -2,7 +2,7 @@
 	import uiStore from '@/stores/ui';
 	import configStore from '@/stores/config';
 	import { browser } from '$app/environment';
-	import type { LatLngExpression, Map, Icon, Marker, Polyline, Circle } from 'leaflet';
+	import type { LatLngExpression, Map, Icon, Marker, Polyline, Circle, LatLng } from 'leaflet';
 	import { onDestroy, onMount } from 'svelte';
 	import { Footer } from '@/components/footer';
 	import { Header } from '@/components/header';
@@ -29,6 +29,7 @@
 	type CurrentPath = {
 		path: number[][];
 		polyline: Polyline | null;
+		businessId?: number;
 	};
 
 	let L: any;
@@ -45,7 +46,7 @@
 	let isTrackingView = false;
 	let prevSelectedBusiness: number = 0;
 	let currentCircle: Circle;
-	let targetMarker: Marker;
+	let targetMarker: Marker | null = null;
 	let lastView: LatLngExpression = initialMapOpts.center!;
 	let resizeDebounce: ReturnType<typeof setTimeout>;
 	let mobileBusinessListOpen: boolean = false;
@@ -78,16 +79,20 @@
 	}
 
 	async function goToPoint(target: LatLngExpression) {
-		currentPath.path = [];
 		await requestPath(target);
 		simulateMovement();
 	}
 
 	async function requestPath(target: LatLngExpression) {
 		if (Array.isArray(target) && Array.isArray(currentView)) {
+			currentPath.path = [];
+			currentPath.polyline?.remove();
+			delete currentPath.businessId;
+
+			const radius = findDistanceBetweenPoints(currentView, target);
 			const circle = createGeoJSONCircle(
 				currentView as number[],
-				$configStore.requestRadius / 1000
+				radius < 2000 ? 2 : radius / 1000
 			);
 			const area = getBoundingBoxFromPolygon(circle);
 
@@ -98,7 +103,11 @@
 			});
 			if (!path) return;
 			const real_target = path[path.length - 1];
-			targetMarker.setLatLng([real_target.lat, real_target.lon]);
+			if (!targetMarker) {
+				createTargetMarker({ lat: real_target.lat, lng: real_target.lon } as LatLng);
+			} else {
+				targetMarker.setLatLng([real_target.lat, real_target.lon]);
+			}
 
 			drawPath(path);
 		}
@@ -117,6 +126,7 @@
 		if (movingInterval && $uiStore.isSimMoving) {
 			clearInterval(movingInterval);
 			targetMarker && targetMarker.remove();
+			targetMarker = null;
 			currentPath.polyline?.remove();
 			currentPath.polyline = null;
 			$uiStore.isSimMoving = false;
@@ -188,8 +198,23 @@
 			opacity: isOpen ? 1 : 0.5,
 			riseOnHover: true
 		})
-			.bindPopup(createBusinessPopup(data, !isOpen))
+			.bindPopup(createBusinessPopup(data, !isOpen, toggleDirections))
+			.addEventListener('click', () => ($uiStore.businessSelected = data.id))
 			.addTo(map);
+	}
+
+	function toggleDirections(ev: MouseEvent) {
+		const target: HTMLElement | null = ev.target as HTMLElement;
+		if (target?.nodeName === 'BUTTON') {
+			ev.stopPropagation();
+			const id = target.getAttribute('id');
+			if (!id) return;
+			if ($uiStore.isSimMoving) {
+				onSimMovementCalled();
+			}
+			const pos = businessMarkers[id].getLatLng();
+			requestPath([pos.lat, pos.lng]);
+		}
 	}
 
 	function onBusinessesFound(res?: BusinessData[]) {
@@ -215,6 +240,7 @@
 			const isOutside =
 				findDistanceBetweenPoints(currentView, [lat, lon]) > $configStore.maxVisibleRadius;
 			if (isOutside) {
+				businessMarkers[key].removeEventListener('click');
 				businessMarkers[key].remove();
 				delete businessMarkers[key];
 				delete newBusinesses[key];
@@ -238,9 +264,17 @@
 		}
 	}
 
+	function createTargetMarker(pos: LatLng) {
+		targetMarker = L.marker(pos, { icon: icons.destination, riseOnHover: true }).addTo(map);
+	}
+
 	function onConfirmPos() {
 		const center = map.getCenter();
-		targetMarker = L.marker(center, { icon: icons.destination, riseOnHover: true }).addTo(map);
+		if (!targetMarker) {
+			createTargetMarker(center);
+		} else {
+			targetMarker.setLatLng(center);
+		}
 		uiStore.update((data) => {
 			data.isChoosingPoint = false;
 			data.onPosConfirmed?.([center.lat, center.lng]);

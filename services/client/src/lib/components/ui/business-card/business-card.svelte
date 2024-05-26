@@ -3,6 +3,8 @@
 	import { SH4, Small } from '@/components/ui/typography';
 	import windowStore from '@/stores/window';
 	import uiStore from '@/stores/ui';
+	import Button from '../button/button.svelte';
+	import { createEventDispatcher } from 'svelte';
 	export let stars: number = 0;
 	export let title: string;
 	export let type: string;
@@ -11,6 +13,7 @@
 	export let id: number;
 	export let isSelected: boolean;
 	let isMobile: boolean;
+	const dispatch = createEventDispatcher();
 
 	function isOpenNow() {
 		const hours = new Date().getHours();
@@ -23,6 +26,7 @@
 
 	function onBusinessClick() {
 		$uiStore.businessSelected = id;
+		dispatch('itemClicked');
 	}
 
 	function stripTitle(str: string, max = 21) {

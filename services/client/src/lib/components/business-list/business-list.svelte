@@ -27,6 +27,7 @@
 			<div class="grid gap-4 py-4">
 				{#each businesses as business (business.id)}
 					<BusinessCard
+						on:itemClicked={() => dialogStateChange(false)}
 						isSelected={$uiStore.businessSelected === business.id}
 						id={business.id}
 						opensAt={business.opensAt}
