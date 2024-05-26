@@ -5,6 +5,8 @@ use crate::Request;
 use serde_json::json;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::future::IntoFuture;
+use tokio::task::spawn_blocking;
 
 pub struct Router<'a> {
     pub routes: Vec<&'a str>,
@@ -132,23 +134,27 @@ impl<'a> Router<'a> {
             return Ok(Response::not_found(Some("Could not construct the path")));
         }
 
-        let path = create_path(
-            res.elements,
-            (
-                origin.as_array().unwrap()[0].as_f64().unwrap(),
-                origin.as_array().unwrap()[1].as_f64().unwrap(),
-            ),
-            (
-                target.as_array().unwrap()[0].as_f64().unwrap(),
-                target.as_array().unwrap()[1].as_f64().unwrap(),
-            ),
-        );
+        let path_finder_thread = spawn_blocking(move || {
+            let path = create_path(
+                res.elements,
+                (
+                    origin.as_array().unwrap()[0].as_f64().unwrap(),
+                    origin.as_array().unwrap()[1].as_f64().unwrap(),
+                ),
+                (
+                    target.as_array().unwrap()[0].as_f64().unwrap(),
+                    target.as_array().unwrap()[1].as_f64().unwrap(),
+                ),
+            );
 
-        if path.is_err() {
-            return Ok(Response::internal(Some(json!({"message": path.err()}))));
-        }
+            if path.is_err() {
+                return Response::internal(Some(json!({"message": path.err()})));
+            }
 
-        Ok(Response::success(json!({"path": path.unwrap()}), None))
+            Response::success(json!({"path": path.unwrap()}), None)
+        });
+        let result = path_finder_thread.into_future().await?;
+        Ok(result)
     }
 
     async fn handle_create_business(
