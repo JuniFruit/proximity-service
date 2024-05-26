@@ -10,13 +10,23 @@
 	function onSimMoveCalled() {
 		dispatch('simulateMovement');
 	}
+
+	function onBusinessListClicked() {
+		dispatch('businessListClicked');
+	}
 </script>
 
 <div class="container_f">
 	<div class="container_inner">
 		<div class="button_container">
 			<Actions on:simulateMovement={onSimMoveCalled} />
-			<Button class="main_button" disabled={$uiStore.isChoosingPoint} variant="outline" size="icon">
+			<Button
+				class="main_button"
+				disabled={$uiStore.isChoosingPoint}
+				on:click={onBusinessListClicked}
+				variant="outline"
+				size="icon"
+			>
 				{#if !$uiStore.isLoading}
 					<img src="map.png" alt="map" class="h-8 w-8" />
 				{:else}

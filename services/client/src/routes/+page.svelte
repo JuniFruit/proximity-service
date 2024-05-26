@@ -24,6 +24,7 @@
 	import windowStore from '@/stores/window';
 	import { Button } from '@/components/ui/button';
 	import type { WayNode } from '@/types/api';
+	import BusinessList from '@/components/business-list/business-list.svelte';
 
 	type CurrentPath = {
 		path: number[][];
@@ -35,7 +36,7 @@
 	let mapContainer: HTMLDivElement;
 	let businesses: Record<string, BusinessData> = {};
 	let currentView: LatLngExpression = initialMapOpts.center!;
-	let defaultZoom = 15.5;
+	let defaultZoom = 14;
 	let watchPosId: number;
 	let icons: Record<string, Icon>;
 	let currentPosMarker: Marker;
@@ -46,6 +47,8 @@
 	let currentCircle: Circle;
 	let targetMarker: Marker;
 	let lastView: LatLngExpression = initialMapOpts.center!;
+	let resizeDebounce: ReturnType<typeof setTimeout>;
+	let mobileBusinessListOpen: boolean = false;
 	let currentPath: CurrentPath = {
 		path: [],
 		polyline: null
@@ -66,7 +69,7 @@
 
 	function init(container: HTMLElement) {
 		map = createMap(container, L);
-		watchPosId = getUserGeo((pos) => onPosChanged(pos, true));
+		watchPosId = getUserGeo((pos) => onPosChanged(pos, isTrackingView));
 		icons = setupIcons(L);
 		map.setZoom(defaultZoom);
 		map.on('drag', () => {
@@ -132,10 +135,7 @@
 	}
 
 	function simulateMovement() {
-		uiStore.update((data) => {
-			data.isSimMoving = true;
-			return data;
-		});
+		$uiStore.isSimMoving = true;
 		movingInterval = setInterval(() => {
 			const nodePos = currentPath.path.shift();
 			if (!nodePos) {
@@ -155,10 +155,7 @@
 	}
 
 	function simulateFlying(target: [number, number]) {
-		uiStore.update((data) => {
-			data.isSimMoving = true;
-			return data;
-		});
+		$uiStore.isSimMoving = true;
 		movingInterval = setInterval(() => {
 			const lat1 = (currentView as unknown as [number, number])[0];
 			const lon1 = (currentView as unknown as [number, number])[1];
@@ -239,11 +236,6 @@
 		if (isTrackingView || isSetView) {
 			map.setView(currentView);
 		}
-		if (!currentCircle) {
-			currentCircle = L.circle(currentView, { radius: $configStore.requestRadius }).addTo(map);
-		} else {
-			currentCircle.setLatLng(currentView);
-		}
 	}
 
 	function onConfirmPos() {
@@ -257,10 +249,7 @@
 	}
 
 	function onCancelPos() {
-		uiStore.update((data) => {
-			data.isChoosingPoint = false;
-			return data;
-		});
+		$uiStore.isChoosingPoint = false;
 	}
 
 	function setOnCurrentPos() {
@@ -269,6 +258,16 @@
 	}
 
 	function updateNavMarker() {
+		if (!currentCircle) {
+			currentCircle = L.circle(currentView, {
+				radius: $configStore.requestRadius,
+				color: '#b6f4e3'
+			}).addTo(map);
+		} else {
+			currentCircle.setLatLng(currentView);
+			currentCircle.setStyle({});
+		}
+
 		if (currentPosMarker) {
 			currentPosMarker.setLatLng(currentView);
 		} else {
@@ -277,8 +276,11 @@
 	}
 
 	function onWindowResize() {
-		const isMobile = window.innerWidth <= 800 && window.innerHeight <= 600;
-		windowStore.update(() => isMobile);
+		clearTimeout(resizeDebounce);
+		resizeDebounce = setTimeout(() => {
+			const isMobile = window.innerWidth <= 800;
+			windowStore.update(() => isMobile);
+		}, 400);
 	}
 
 	function onLocationSelected(pos: CustomEvent<[number, number]>) {
@@ -304,6 +306,7 @@
 			navigator.geolocation.clearWatch(watchPosId);
 		}
 		if (browser) {
+			clearTimeout(resizeDebounce);
 			window.removeEventListener('resize', onWindowResize);
 		}
 		clearInterval(movingInterval);
@@ -329,11 +332,22 @@
 			</div>
 		{/if}
 	</div>
-	<div class="carousel_container">
-		<BusinessCarousel businesses={Object.values(businesses)} />
-	</div>
+	{#if !$windowStore}
+		<div class="carousel_container">
+			<BusinessCarousel businesses={Object.values(businesses)} />
+		</div>
+	{:else}
+		<BusinessList
+			on:dialogClosed={() => (mobileBusinessListOpen = false)}
+			isDialogOpen={mobileBusinessListOpen}
+			businesses={Object.values(businesses)}
+		/>
+	{/if}
 	<div class="footer_container">
-		<Footer on:simulateMovement={onSimMovementCalled} />
+		<Footer
+			on:businessListClicked={() => (mobileBusinessListOpen = !mobileBusinessListOpen)}
+			on:simulateMovement={onSimMovementCalled}
+		/>
 	</div>
 	{#if $uiStore.isChoosingPoint}
 		<div class="confirm_container">

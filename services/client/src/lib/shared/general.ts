@@ -21,7 +21,8 @@ export const initialMapOpts: MapOptions = {
 	preferCanvas: true,
 	center: [39, -98],
 	zoom: 5,
-	attributionControl: false
+	attributionControl: false,
+	zoomControl: false
 };
 
 export function setupIcons(L: any) {

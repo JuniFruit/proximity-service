@@ -22,10 +22,7 @@
 	});
 
 	function onBusinessClick() {
-		uiStore.update((data) => {
-			data.businessSelected = id;
-			return data;
-		});
+		$uiStore.businessSelected = id;
 	}
 
 	function stripTitle(str: string, max = 21) {
@@ -71,13 +68,13 @@
 
 <style scoped lang="postcss">
 	.card_container {
-		@apply flex  w-full overflow-hidden rounded-xl bg-white;
+		@apply flex w-full items-center overflow-hidden rounded-xl bg-white;
 	}
 	.image_container {
 		@apply h-28 w-24;
 	}
 	.image_container img {
-		@apply h-auto w-full;
+		@apply h-full w-full;
 	}
 	.body_container {
 		@apply px-3 py-2;

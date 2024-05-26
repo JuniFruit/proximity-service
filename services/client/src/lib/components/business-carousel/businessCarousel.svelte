@@ -11,7 +11,7 @@
 <Carousel.Root class="h-fit w-full">
 	<Carousel.Content>
 		{#each businesses as business (business.id)}
-			<Carousel.Item class={!$windowStore ? 'basis-1/2' : 'basis-0'}>
+			<Carousel.Item class={!$windowStore ? 'basis-1/2' : ''}>
 				<BusinessCard
 					isSelected={$uiStore.businessSelected === business.id}
 					id={business.id}

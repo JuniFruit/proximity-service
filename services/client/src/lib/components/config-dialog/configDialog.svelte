@@ -31,10 +31,7 @@
 		window.location.reload();
 	}
 	function onModeSelected(value: string) {
-		configStore.update((data) => {
-			data.simMovementMode = value as 'drive' | 'fly';
-			return data;
-		});
+		$configStore.simMovementMode = value as 'drive' | 'fly';
 	}
 
 	onMount(() => {
