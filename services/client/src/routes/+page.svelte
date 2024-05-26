@@ -78,6 +78,7 @@
 	}
 
 	async function goToPoint(target: LatLngExpression) {
+		currentPath.path = [];
 		await requestPath(target);
 		simulateMovement();
 	}
@@ -116,10 +117,7 @@
 			targetMarker && targetMarker.remove();
 			currentPath.polyline?.remove();
 			currentPath.polyline = null;
-			uiStore.update((data) => {
-				data.isSimMoving = false;
-				return data;
-			});
+			$uiStore.isSimMoving = false;
 			return;
 		}
 
