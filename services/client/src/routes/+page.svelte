@@ -96,9 +96,11 @@
 				origin: currentView as number[],
 				target: target as number[]
 			});
-			if (path) {
-				drawPath(path);
-			}
+			if (!path) return;
+			const real_target = path[path.length - 1];
+			targetMarker.setLatLng([real_target.lat, real_target.lon]);
+
+			drawPath(path);
 		}
 	}
 
