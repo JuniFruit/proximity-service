@@ -5,6 +5,7 @@ const faker = require("@faker-js/faker").allFakers;
 
 const TYPES = ["restaurant", "car-wash", "cafe", "hotel", "shop"];
 const maxBusinessPerCity = 70;
+const maxCitites = 47869;
 
 const rnd = (num) => {
   return Math.floor(Math.random() * num);
@@ -42,7 +43,7 @@ const connectToAllDbs = async () => {
     `mongodb://${process.env.MONGO_INITDB_ROOT_USERNAME}:${process.env.MONGO_INITDB_ROOT_PASSWORD}@${process.env.MAIN_HOST}:${process.env.MONGO_MAIN_PORT_1}`,
   );
   await mongo1.connect();
-  const mongoDB = mongo1.db("main");
+  const mongoDB = mongo1.db("main").collection("businesses");
 
   return {
     redisGeo1,
@@ -52,136 +53,140 @@ const connectToAllDbs = async () => {
   };
 };
 
-const generateData = async (line, clients) => {
+const generateData = async (line, clients, records) => {
   const [_, __, latitude, longitude] = line.split(",");
   let created = 0;
   const center = {
     latitude: parseFloat(latitude?.replaceAll('"', "")),
     longitude: parseFloat(longitude?.replaceAll('"', "")),
   };
+  const geoPipe = clients.redisGeo1.multi();
+  const redisBusinessPipe = clients.redisBusiness1.multi();
 
   for (let i = 0; i < maxBusinessPerCity; i++) {
-    try {
-      const { latitude: lat, longitude: lon } = randomGeo(center, 12000);
-      if (!lat || !lon) continue;
-      const zipCode = faker.en.location.zipCode();
-      const stars = faker.en.number.int({ min: 2, max: 5 });
-      const opensAt = faker.en.number.int({ min: 6, max: 12 });
-      const closesAt = faker.en.number.int({ min: 18, max: 24 });
-      const averagePrice = faker.en.number.int({ min: 5, max: 25 });
-      const description = faker.en.lorem.paragraph();
-      const email = faker.en.internet.email();
-      const phone = faker.en.phone.number().toString();
-      const name = faker.en.company.name();
-      const id = faker.en.seed();
+    const { latitude: lat, longitude: lon } = randomGeo(center, 12000);
+    if (!lat || !lon) continue;
+    const zipCode = faker.en.location.zipCode();
+    const stars = faker.en.number.int({ min: 2, max: 5 });
+    const opensAt = faker.en.number.int({ min: 6, max: 12 });
+    const closesAt = faker.en.number.int({ min: 18, max: 24 });
+    const averagePrice = faker.en.number.int({ min: 5, max: 25 });
+    const description = faker.en.lorem.paragraph();
+    const email = faker.en.internet.email();
+    const phone = faker.en.phone.number().toString();
+    const name = faker.en.company.name();
+    const id = faker.en.seed();
 
-      const record = Object.setPrototypeOf(
-        {
-          id,
-          zipCode,
-          name,
-          stars,
-          type: TYPES[rnd(TYPES.length)],
-          lat,
-          lon,
-          opensAt,
-          closesAt,
-          averagePrice,
-          description,
-          email,
-          phone,
-        },
-        null,
-      );
-      const promises = [
-        clients.redisGeo1.call(
-          "GEOADD",
-          "world",
-          record.lon,
-          record.lat,
-          record.id,
-        ),
-        clients.redisBusiness1.call(
-          "HSET",
-          record.id,
-          "zipCode",
-          zipCode,
-          "name",
-          name,
-          "stars",
-          stars,
-          "lat",
-          lat,
-          "lon",
-          lon,
-          "type",
-          record.type,
-          "averagePrice",
-          averagePrice,
-          "closesAt",
-          closesAt,
-          "opensAt",
-          opensAt,
-          "description",
-          description,
-          "email",
-          email,
-          "phone",
-          phone,
-        ),
-        clients.mongoDB.collection("businesses").insertOne(record),
-      ];
-      await Promise.all(promises);
-      created++;
-    } catch (error) {
-      handleErr(error);
-      continue;
-    }
+    const record = Object.setPrototypeOf(
+      {
+        id,
+        zipCode,
+        name,
+        stars,
+        type: TYPES[rnd(TYPES.length)],
+        lat,
+        lon,
+        opensAt,
+        closesAt,
+        averagePrice,
+        description,
+        email,
+        phone,
+      },
+      null,
+    );
+    geoPipe.call("GEOADD", "world", record.lon, record.lat, record.id);
+    redisBusinessPipe.call(
+      "HSET",
+      record.id,
+      "zipCode",
+      zipCode,
+      "name",
+      name,
+      "stars",
+      stars,
+      "lat",
+      lat,
+      "lon",
+      lon,
+      "type",
+      record.type,
+      "averagePrice",
+      averagePrice,
+      "closesAt",
+      closesAt,
+      "opensAt",
+      opensAt,
+      "description",
+      description,
+      "email",
+      email,
+      "phone",
+      phone,
+    );
+    records.push(record);
+    created++;
   }
+  await geoPipe.exec();
+  await redisBusinessPipe.exec();
   return created;
 };
 
 const generateRecords = async () => {
-  const clients = await connectToAllDbs();
-  const maxRecords = 47868;
-  let ind = 0;
-  let created = 0;
+  try {
+    const clients = await connectToAllDbs();
+    let ind = 0;
+    let created = 0;
+    let records = [];
+    const mongoBatch = 10000;
 
-  const fileStream = fs.createReadStream("./worldcities.csv");
-  fileStream.le;
+    let lineReader = require("readline").createInterface({
+      input: fs.createReadStream("./worldcities.csv"),
+    });
 
-  let lineReader = require("readline").createInterface({
-    input: fs.createReadStream("./worldcities.csv"),
-  });
+    for await (const line of lineReader) {
+      if (ind >= maxCitites) break;
+      if (ind % 50 == 0) {
+        const done = Math.trunc((ind / maxCitites) * 100);
+        console.clear();
+        console.log("Migrating data... \nCities processed: " + ind);
+        console.log("Businesses recorded: " + created);
+        console.log(
+          "You can exit script at any time if you think it is enough records",
+        );
+        console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
+        console.log("Done: " + done + "%");
+      }
 
-  for await (const line of lineReader) {
-    if (ind % 50 == 0) {
-      const done = Math.trunc((ind / maxRecords) * 100);
-      console.clear();
-      console.log("Migrating data... \nLines processed: " + ind);
-      console.log("Item recorded: " + created);
-      console.log("[" + "#".repeat(done) + "_".repeat(100 - done) + "]");
-      console.log("Done: " + done + "%");
+      try {
+        created += await generateData(line, clients, records);
+        if (created % mongoBatch === 0) {
+          await clients.mongoDB.insertMany(records);
+          records = [];
+        }
+
+        ind++;
+      } catch (error) {
+        handleErr(error);
+        ind++;
+        continue;
+      }
     }
 
-    try {
-      created += await generateData(line, clients);
-      ind++;
-    } catch (error) {
-      handleErr(error);
-      ind++;
-      continue;
+    if (records.length) {
+      await clients.mongoDB.insertMany(records);
     }
+    console.clear();
+    console.log("Closing connections...");
+    await clients.mongoInstance.close();
+    await clients.redisGeo1.disconnect();
+    await clients.redisBusiness1.disconnect();
+    console.log("Finished migrating data. Entries created: " + created);
+  } catch (error) {
+    handleErr(error);
+  } finally {
+    process.exit(1);
   }
-
-  console.clear();
-  console.log("Closing connections...");
-  await clients.mongoInstance.close();
-  await clients.redisGeo1.disconnect();
-  await clients.redisBusiness1.disconnect();
-  console.log("Finished migrating data. Entries created: " + created);
-
-  process.exit(1);
 };
 
 function handleErr(error) {
